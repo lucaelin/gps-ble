@@ -26,13 +26,17 @@ const hopefullyDevice = new Promise((res, rej)=>{
   connect.addEventListener('click', async ()=>{
 
     console.log('Requesting any Bluetooth Device...');
-    const device = await navigator.bluetooth.requestDevice({
-      //filters: [{services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']},],
-      acceptAllDevices: true,
-      optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'],
-    });
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        //filters: [{services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']},],
+        acceptAllDevices: true,
+        optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'],
+      });
 
-    res(device);
+      res(device);
+    } catch(e) {
+      dom.status.textContent = e.message;
+    }
   });
 });
 
@@ -83,7 +87,7 @@ const currentLocation = L.marker([0, 0]).addTo(mymap);
     }));
   } catch(e) {
     console.error(e);
-    dom.status.textContent = 'error...'
+    dom.status.textContent = e.message;
   }
 
   window.setTimeout(init, 5000);
