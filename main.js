@@ -1,7 +1,7 @@
 const connect = document.querySelector('button[name=connect]');
 
 const dom = {
-  device: document.querySelector('.device'),
+  device: document.querySelector('.connect'),
   status: document.querySelector('.status'),
 
   date: document.querySelector('.date'),

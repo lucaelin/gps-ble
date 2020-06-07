@@ -15,12 +15,20 @@ html, body {
 body {
   display: grid;
   grid-gap: 1rem;
-  grid-template: "h1" auto "dev" auto "gps" auto "map" 1fr;
+  grid-template:
+    "h1" auto
+    "dev" auto
+    "gps" auto
+    "map" 1fr;
 }
 
 @media (min-width: 800px) {
   body {
-    grid-template: "h1 h1" auto "dev gps" auto "map map" 1fr;
+    grid-template:
+      "h1   h1"   auto
+      "dev  gps"  auto
+      "map  map"  1fr /
+      1fr   1fr   ;
   }
 }
 
