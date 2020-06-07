@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Title</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta http-equiv="Content-Security-Policy" content="
+          default-src 'none';
+          base-uri 'none';
+          script-src 'self' https://unpkg.com/;
+          connect-src 'self';
+          style-src 'self' https://unpkg.com/;
+          img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com/;
+          require-trusted-types-for none;
+          upgrade-insecure-requests;
+        " />
+        <link rel="stylesheet" type="text/css" href="style.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+          integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+          crossorigin=""/>
+        <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+          integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+          crossorigin=""></script>
+        <script defer="defer" type="text/javascript" src="main.js" ></script>
+    </head>
+    <body>
+      <button name="connect">connect</button>
+      <p>date: <span class="date"></span></p>
+      <p>time: <span class="time"></span></p>
+      <p>sats: <span class="sats"></span></p>
+      <p>lat: <span class="lat"></span></p>
+      <p>lng: <span class="lng"></span></p>
+      <p>alt: <span class="alt"></span></p>
+      <div id="mymap"></div>
+    </body>
+</html>
