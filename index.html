@@ -24,13 +24,23 @@
         <script defer="defer" type="text/javascript" src="main.js" ></script>
     </head>
     <body>
-      <button name="connect">connect</button>
-      <p>date: <span class="date"></span></p>
-      <p>time: <span class="time"></span></p>
-      <p>sats: <span class="sats"></span></p>
-      <p>lat: <span class="lat"></span></p>
-      <p>lng: <span class="lng"></span></p>
-      <p>alt: <span class="alt"></span></p>
+      <h1>GPS-BLE</h1>
+      <div id="dev" class="card">
+        <div>device: </div>
+        <div>status: </div>
+        <div></div>
+        <span class="connect"><button name="connect">connect</button></span>
+        <span class="status">not connected</span>
+        <div></div>
+      </div>
+      <div id="gps" class="card">
+        <div>date: <span class="date">-</span></div>
+        <div>time: <span class="time">-</span></div>
+        <div>sats: <span class="sats">-</span></div>
+        <div>lat: <span class="lat">-</span></div>
+        <div>lng: <span class="lng">-</span></div>
+        <div>alt: <span class="alt">-</span></div>
+      </div>
       <div id="mymap"></div>
     </body>
 </html>

@@ -4,10 +4,52 @@
 
 html, body {
   margin: 0;
-  background-color: #333334;
+  background-color: #222223;
   color: white;
+  font-family: 'ubuntu', sans-serif;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-gap: 1rem;
+  grid-template: "h1" auto "dev" auto "gps" auto "map" 1fr;
+}
+
+@media (min-width: 800px) {
+  body {
+    grid-template: "h1 h1" auto "dev gps" auto "map map" 1fr;
+  }
+}
+
+h1 {
+  margin: 0.26rem;
+  text-align: center;
+  grid-area: h1;
+}
+
+.card {
+  margin: 0rem 1rem;
+  padding: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  grid-auto-flow: column;
+  background-color: #EEF3;
+  box-shadow: 3px 3px 6px black;
+  font-family: 'ubuntu mono', monospace;
+}
+
+#dev {
+  grid-area: dev;
+}
+
+#gps {
+  grid-area: gps;
 }
 
 #mymap {
-  height: 700px;
+  grid-area: map;
 }

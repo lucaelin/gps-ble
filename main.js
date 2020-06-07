@@ -1,6 +1,9 @@
 const connect = document.querySelector('button[name=connect]');
 
 const dom = {
+  device: document.querySelector('.device'),
+  status: document.querySelector('.status'),
+
   date: document.querySelector('.date'),
   time: document.querySelector('.time'),
   sats: document.querySelector('.sats'),
@@ -46,6 +49,9 @@ const currentLocation = L.marker([0, 0]).addTo(mymap);
     console.log('Waiting for device selection');
     const device = await hopefullyDevice;
 
+    dom.device.textContent = device.name;
+    dom.status.textContent = 'connecting...';
+
     console.log('Connecting to GATT Server...');
     const server = await device.gatt.connect();
 
@@ -72,9 +78,12 @@ const currentLocation = L.marker([0, 0]).addTo(mymap);
       console.log(date, time, sats, age);
       console.log(lat, lng, alt);
       currentLocation.setLatLng([lat,lng]);
+
+      dom.status.textContent = age > 1500 ? 'waiting for gps fix' : 'gps fix';
     }));
   } catch(e) {
     console.error(e);
+    dom.status.textContent = 'error...'
   }
 
   window.setTimeout(init, 5000);
