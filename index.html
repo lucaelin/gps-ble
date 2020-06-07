@@ -11,8 +11,8 @@
           connect-src 'self';
           style-src 'self' https://unpkg.com/;
           img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com/;
-          require-trusted-types-for none;
-          upgrade-insecure-requests;
+          -require-trusted-types-for 'script';
+          -upgrade-insecure-requests;
         " />
         <link rel="stylesheet" type="text/css" href="style.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
