@@ -2,108 +2,192 @@
     Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleWrite.cpp
     Ported to Arduino ESP32 by Evandro Copercini
 */
-#include <TinyGPS++.h>
-#include <SoftwareSerial.h>
+
+#include <NMEAGPS.h>
+#include "FS.h"
+#include "FFat.h"
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
 
-#define SERVICE_UUID            "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-#define CHARACTERISTIC_GPS_UUID "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-#define CHARACTERISTIC_UUID     "a7045ffc-6ed3-4ec9-ace2-5cdfeff5101d"
+#define SERVICE_UUID            "2e1d0001-cc74-4675-90a3-ec80f1037391"
+#define CHARACTERISTIC_GPS_UUID "2e1d0002-cc74-4675-90a3-ec80f1037391"
+#define CHARACTERISTIC_HIS_UUID "2e1d0003-cc74-4675-90a3-ec80f1037391"
+
+
+BLEServer *pServer = NULL;
+BLEService *pService = NULL;
+BLECharacteristic *currentGPSCharacteristic = NULL;
+BLECharacteristic *historyGPSCharacteristic = NULL;
+BLEAdvertising *pAdvertising = NULL;
 
 static const int RXPin = 14, TXPin = 12;
 static const uint32_t GPSBaud = 9600;
 
 struct GpsData {
-  uint32_t lastDate;
-  uint32_t lastTime;
-  uint32_t lastSats;
-  uint32_t lastAge;
-  double lastLat;
-  double lastLng;
-  double lastAlt;
+  uint32_t time;
+  uint32_t sats;
+  float lat;
+  float lng;
+  float alt;
+  float heading;
 };
 
-GpsData gpsData;
-std::string currentValue = "Hello world";
+File gps_log;
+NMEAGPS gps;
+GpsData last_gps;
 
-TinyGPSPlus gps;
-BLEService *pService;
+class MyServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      Serial.println("BLE connected");
+    };
 
-// The serial connection to the GPS device
-SoftwareSerial ss(RXPin, TXPin);
-
-class MyCallbacks: public BLECharacteristicCallbacks {
-    void onRead (BLECharacteristic *pCharacteristic) {
-      pCharacteristic->setValue(currentValue);
-    }
-    void onWrite(BLECharacteristic *pCharacteristic) {
-      currentValue = pCharacteristic->getValue();
-
-      if (currentValue.length() > 0) {
-        Serial.println("*********");
-        Serial.print("New value: ");
-        for (int i = 0; i < currentValue.length(); i++)
-          Serial.print(currentValue[i]);
-
-        Serial.println();
-        Serial.println("*********");
-      }
+    void onDisconnect(BLEServer* pServer) {
+      Serial.println("BLE disconnected");
     }
 };
-
 
 class GpsCallbacks: public BLECharacteristicCallbacks {
     void onRead (BLECharacteristic *pCharacteristic) {
-      pCharacteristic->setValue((uint8_t*)&gpsData, sizeof(GpsData));
+      pCharacteristic->setValue((uint8_t*)&last_gps, sizeof(GpsData));
+    }
+};
+class GpsCallbacks2: public BLECharacteristicCallbacks {
+    void onRead (BLECharacteristic *pCharacteristic) {
+      pCharacteristic->setValue((uint8_t*)&last_gps, sizeof(GpsData));
     }
 };
 
 void setup() {
   Serial.begin(115200);
-  ss.begin(GPSBaud);
+  Serial1.begin(9600, (uint32_t) SERIAL_8N1, 14, 12);
+  delay(100);
+
+  BLEDevice::init("neo6m");
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  pService = pServer->createService(SERVICE_UUID);
+
+  currentGPSCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_GPS_UUID,
+                                         BLECharacteristic::PROPERTY_READ | 
+                                         BLECharacteristic::PROPERTY_NOTIFY |
+                                         BLECharacteristic::PROPERTY_INDICATE
+                                       );
+  currentGPSCharacteristic->addDescriptor(new BLE2902());
+  currentGPSCharacteristic->setValue((uint8_t*)&last_gps, sizeof(GpsData));
+  
+  historyGPSCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_HIS_UUID,
+                                         BLECharacteristic::PROPERTY_READ | 
+                                         BLECharacteristic::PROPERTY_NOTIFY |
+                                         BLECharacteristic::PROPERTY_INDICATE
+                                       );
+  
+  pService->start();
+
+  pAdvertising = pServer->getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
+  pAdvertising->setMinPreferred(0x12);
+  pAdvertising->start();
+
+  delay(100);
+
+  //FFat.format();
+  Serial.setDebugOutput(true);
+  if(!FFat.begin(true)){
+      Serial.println("FFat Mount Failed");
+      return;
+  }
 
   Serial.println("1- Go to https://lucaelin.github.io/gps-ble");
   Serial.println("2- Connect to neo6m");
   Serial.println("3- Profit!");
 
-  BLEDevice::init("neo6m");
-  BLEServer *pServer = BLEDevice::createServer();
-
-  pService = pServer->createService(SERVICE_UUID);
-  
-  BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_GPS_UUID,
-                                         BLECharacteristic::PROPERTY_READ
-                                       );
-
-  pCharacteristic->setCallbacks(new GpsCallbacks());
-
-  pService->start();
-
-  BLEAdvertising *pAdvertising = pServer->getAdvertising();
-  pAdvertising->start();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  while (ss.available() > 0){
-    gps.encode(ss.read());
+  while (gps.available( Serial1 )) {
+    boolean firstTimeSync = false;
+    gps_fix fix = gps.read();
 
-    gpsData.lastDate = gps.date.value();
-    gpsData.lastTime = gps.time.value();
-    gpsData.lastSats = gps.satellites.value();
-    gpsData.lastAge  = gps.location.age();
-    
-    if (gps.location.isUpdated()){
-      gpsData.lastLat = gps.location.lat();
-      gpsData.lastLng = gps.location.lng();
-      gpsData.lastAlt = gps.altitude.meters();
+    if (fix.valid.date && fix.valid.time)
+    {
+      if (last_gps.time == 0) Serial.println("Got valid time");
+      firstTimeSync = last_gps.time == 0;
+      last_gps.time = (NeoGPS::clock_t) fix.dateTime;
     }
+
+    if (fix.valid.satellites)
+    {
+      last_gps.sats = fix.satellites;
+    }
+
+    if (fix.valid.location)
+    {
+      last_gps.lat = fix.latitude();
+      last_gps.lng = fix.longitude();
+    }
+
+    if (fix.valid.altitude)
+    {
+      last_gps.alt = fix.altitude();
+    }
+
+    if (fix.valid.heading)
+    {
+      last_gps.heading = fix.heading();
+    }
+    
+    currentGPSCharacteristic->setValue((uint8_t*)&last_gps, sizeof(GpsData));
+    currentGPSCharacteristic->notify();
+    delay(3);
+
+    if (!fix.valid.location && !firstTimeSync) continue;
+    
+    gps_log = FFat.open("/gps_log.bin", FILE_APPEND);
+    if (!gps_log) {
+      Serial.println("There was an error opening the file for writing");
+      continue;
+    }
+    gps_log.write((uint8_t*) &last_gps, sizeof(GpsData));
+    gps_log.close();
+    Serial.println("Wrote location to file");
+
+    /*
+
+      if (fix.valid.speed)
+      {
+      Serial.print(F("SPEED:   KM/h="));
+      Serial.println( fix.speed_kph() );
+      }
+    */
+
   }
+
+}
+
+void readGpsLog() {
+  gps_log = FFat.open("/gps_log.bin");
+  if (!gps_log) {
+    Serial.println("There was an error opening the file for writing");
+    return;
+  }
+  while (gps_log.available()) {
+    GpsData new_gps;
+    gps_log.read((uint8_t*) &new_gps, sizeof(GpsData));
+    Serial.print(new_gps.time);
+    Serial.print(", ");
+  }
+  Serial.print("\n");
+  gps_log.close();
+  Serial.println("Read locations from file");
 }

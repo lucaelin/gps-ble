@@ -12,6 +12,12 @@ const dom = {
   alt: document.querySelector('.alt'),
 }
 
+const ble = {
+  service: "2e1d0001-cc74-4675-90a3-ec80f1037391",
+  current: "2e1d0002-cc74-4675-90a3-ec80f1037391",
+  history: "2e1d0003-cc74-4675-90a3-ec80f1037391",
+}
+
 function decodeText(data) {
   var dec = new TextDecoder('utf-8');
   var arr = new Uint8Array(data);
@@ -28,9 +34,9 @@ const hopefullyDevice = new Promise((res, rej)=>{
     console.log('Requesting any Bluetooth Device...');
     try {
       const device = await navigator.bluetooth.requestDevice({
-        //filters: [{services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']},],
+        //filters: [{services: ['2e1d0001-cc74-4675-90a3-ec80f1037391']},],
         acceptAllDevices: true,
-        optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'],
+        optionalServices: Object.values(ble),
       });
 
       res(device);
@@ -59,36 +65,38 @@ const currentLocation = L.marker([0, 0]).addTo(mymap);
     console.log('Connecting to GATT Server...');
     const server = await device.gatt.connect();
 
-    // Note that we could also get all services that match a specific UUID by
-    // passing it to getPrimaryServices().
-    console.log('Getting Services...');
-    const services = await server.getPrimaryServices();
+    console.log('Getting Service...');
+    const service = await server.getPrimaryServices(ble.service).then(s=>s[0]);
 
     console.log('Getting Characteristics...');
-    const hopefullyChars = services.map(async s=>await s.getCharacteristics());
-    const characteristics = await Promise.all(hopefullyChars);
+    const ccurrent = await service.getCharacteristics(ble.current).then(c=>c[0]);
+    const chistory = await service.getCharacteristics(ble.history).then(c=>c[0]);
 
-    await Promise.all(characteristics.flat().map(async c=>{
-      const v = await c.readValue();
-      const [date, time, sats, age] = new Uint32Array(v.buffer);
-      const [lat, lng, alt] = new Float64Array(v.buffer).slice(2);
+    console.log(ccurrent, chistory);
+    await ccurrent.startNotifications();
+    ccurrent.addEventListener('characteristicvaluechanged', (e)=>{
+      const v = e.target.value;
+      const [time, sats] = new Uint32Array(v.buffer);
+      const [lat, lng, alt] = new Float32Array(v.buffer).slice(2);
 
-      dom.date.textContent = date.toString().padStart(6, '0').match(/.{1,2}/g).join('.');
-      dom.time.textContent = time.toString().padStart(8, '0').match(/.{1,2}/g).join(':');
+      // time is relative to Y2K
+      const Y2K = 946684800;
+      const date = new Date((Y2K + time) * 1000);
+
+      dom.date.textContent = date.toLocaleDateString();
+      dom.time.textContent = date.toLocaleTimeString();
       dom.sats.textContent = sats;
-      dom.lat.textContent = lat;
-      dom.lng.textContent = lng;
-      dom.alt.textContent = alt;
-      console.log(date, time, sats, age);
+      dom.lat.textContent = lat.toFixed(5).padStart(9);
+      dom.lng.textContent = lng.toFixed(5).padStart(9);
+      dom.alt.textContent = alt.toFixed(1).padStart(5);
+      console.log(date, time, sats);
       console.log(lat, lng, alt);
       currentLocation.setLatLng([lat,lng]);
 
-      dom.status.textContent = age > 1500 ? 'waiting for gps fix' : 'gps fix';
-    }));
+      dom.status.textContent = lat === 0 && lng === 0 ? 'waiting for gps fix' : 'gps fix';
+    });
   } catch(e) {
     console.error(e);
     dom.status.textContent = e.message;
   }
-
-  window.setTimeout(init, 5000);
 })();

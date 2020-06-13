@@ -59,6 +59,7 @@ h1 {
   background-color: #EEF3;
   box-shadow: 3px 3px 6px black;
   font-family: 'ubuntu mono', monospace;
+  white-space: pre;
 }
 
 #dev {
