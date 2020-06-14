@@ -18,7 +18,7 @@
 #define SERVICE_UUID            "2e1d0001-cc74-4675-90a3-ec80f1037391"
 #define CHARACTERISTIC_GPS_UUID "2e1d0002-cc74-4675-90a3-ec80f1037391"
 #define CHARACTERISTIC_HIS_UUID "2e1d0003-cc74-4675-90a3-ec80f1037391"
-#define CHARACTERISTIC_MTU 512
+#define CHARACTERISTIC_MTU 200
 
 BLEServer *pServer = NULL;
 BLEService *pService = NULL;
@@ -29,7 +29,7 @@ BLEAdvertising *pAdvertising = NULL;
 static const int RXPin = 14, TXPin = 12;
 static const uint32_t GPSBaud = 9600;
 
-// max 20 byte in BLE notify payload
+// max 20 byte to fit into BLE notify payload
 __attribute__((packed)) struct GpsData {
   uint32_t time;
   uint8_t status;
@@ -43,8 +43,7 @@ __attribute__((packed)) struct GpsData {
 
 File gps_log;
 NMEAGPS gps;
-GpsData last_gps;
-const uint32_t history_length = 100;
+const uint32_t history_length = 1000;
 uint32_t history_index = 0;
 GpsData history_gps[history_length];
 
@@ -65,24 +64,26 @@ class MyServerCallbacks: public BLEServerCallbacks {
 class GpsCallbacks: public BLECharacteristicCallbacks {
   void onRead (BLECharacteristic *pCharacteristic) {
     uint32_t max_entries = floor(CHARACTERISTIC_MTU / sizeof(GpsData));
-    Serial.print("max_entries: ");
-    Serial.println(max_entries);
-    Serial.print("history_length: ");
-    Serial.println(history_length);
-    Serial.print("history_transfer_index: ");
-    Serial.println(history_transfer_index);
+    //Serial.print("max_entries: ");
+    //Serial.println(max_entries);
+    //Serial.print("history_length: ");
+    //Serial.println(history_length);
+    //Serial.print("history_transfer_index: ");
+    //Serial.println(history_transfer_index);
     uint32_t num_entries = min(max_entries, history_length-history_transfer_index);
-    Serial.print("num_entries: ");
-    Serial.println(num_entries);
+    //Serial.print("num_entries: ");
+    //Serial.println(num_entries);
     pCharacteristic->setValue((uint8_t*)&history_gps[history_transfer_index], num_entries * sizeof(GpsData));
     history_transfer_index += num_entries;
-    Serial.println("Transmission complete");
+    //Serial.println("Transmission complete");
   }
 };
 
 void setup() {
   Serial.begin(115200);
   Serial1.begin(9600, (uint32_t) SERIAL_8N1, 14, 12);
+  
+  // include location error data (GST sentences)
   delay(100);
   gps.send_P( &Serial1, F("PUBX,40,GST,0,1,0,0,0,0") );
   
@@ -95,7 +96,7 @@ void setup() {
       return;
   }
 
-  loadGpsLog();
+  loadGpsHistory();
 
   delay(100);
   setupBLE();
@@ -127,7 +128,6 @@ void setupBLE() {
                                          BLECharacteristic::PROPERTY_INDICATE
                                        );
   currentGPSCharacteristic->addDescriptor(new BLE2902());
-  currentGPSCharacteristic->setValue((uint8_t*) &last_gps, sizeof(GpsData));
   
   pService->start();
 
@@ -141,70 +141,81 @@ void setupBLE() {
 
 void loop() {
   while (gps.available( Serial1 )) {
-    NeoGPS::Location_t last_location( last_gps.lat, last_gps.lng);
+    GpsData previousGpsData = getPreviousEntry();
+    GpsData gpsData = parseFix(gps.read());
     
-    boolean firstTimeSync = false;
-    gps_fix fix = gps.read();
-
-    if (last_gps.status != fix.status) {
+    if (gpsData.status != previousGpsData.status) {
       Serial.print("GPS status change: ");
-      Serial.println(fix.status);
-    }
-    last_gps.status = fix.status;
-
-    if (fix.valid.date && fix.valid.time)
-    {
-      if (last_gps.time == 0) Serial.println("Got valid time");
-      firstTimeSync = last_gps.time == 0;
-      last_gps.time = (NeoGPS::clock_t) fix.dateTime;
-    }
-
-    if (fix.valid.satellites)
-    {
-      last_gps.sats = fix.satellites;
-    }
-
-    if (fix.valid.location)
-    {
-      last_gps.lat = fix.latitude();
-      last_gps.lng = fix.longitude();
-      last_gps.err_lat = ceil(fix.lat_err());
-      last_gps.err_lng = ceil(fix.lon_err());
-    }
-
-    if (fix.valid.altitude)
-    {
-      last_gps.alt = fix.altitude();
+      Serial.println(gpsData.status);
     }
     
-    float travelled = fix.location.DistanceKm( last_location ) * 1000;
-    
-    currentGPSCharacteristic->setValue((uint8_t*)&last_gps, sizeof(GpsData));
+    currentGPSCharacteristic->setValue((uint8_t*)&gpsData, sizeof(GpsData));
     currentGPSCharacteristic->notify();
     delay(3);
 
+    NeoGPS::Location_t previousGpsData_location( previousGpsData.lat, previousGpsData.lng);
+    NeoGPS::Location_t gpsData_location( gpsData.lat, gpsData.lng);
+    float travelled = gpsData_location.DistanceKm( previousGpsData_location ) * 1000;
+    float bearing = gpsData_location.BearingTo( previousGpsData_location );
+    float travelled_lat = cos(bearing) * travelled;
+    float travelled_lng = sin(bearing) * travelled;
+    Serial.print(travelled);
+    Serial.print(travelled_lat);
+    Serial.println(travelled_lng);
 
-    if (!fix.valid.location) continue;
-    if (travelled < max(last_gps.err_lat, last_gps.err_lng) * 2) continue;
+    if (gpsData.status < 3) continue;
+    if (pointInEllipse(travelled_lat, travelled_lng, gpsData.err_lat * 2, gpsData.err_lng * 2)) continue;
 
-    history_gps[history_index] = last_gps;
-    history_index = (history_index + 1) % history_length;
-    
-    gps_log = FFat.open("/gps_log.bin", FILE_APPEND);
-    if (!gps_log) {
-      Serial.println("There was an error opening the file for writing");
-      continue;
-    }
-    gps_log.write((uint8_t*) &last_gps, sizeof(GpsData));
-    gps_log.close();
+    storeGpsEntry(&gpsData);
     
     Serial.println("Wrote location to history");
 
   }
-
 }
 
-void loadGpsLog() {
+
+boolean pointInEllipse(int x, int y, int a, int b) 
+{ 
+  // checking the equation of 
+  // ellipse with the given point 
+  int p = (pow((x), 2) / pow(a, 2)) 
+          + (pow((y), 2) / pow(b, 2)); 
+
+  return p <= 1; 
+} 
+
+GpsData parseFix(gps_fix fix) {
+  GpsData gpsData;
+  
+  gpsData.status = fix.status;
+
+  if (fix.valid.date && fix.valid.time)
+  {
+    gpsData.time = (NeoGPS::clock_t) fix.dateTime;
+  }
+
+  if (fix.valid.satellites)
+  {
+    gpsData.sats = fix.satellites;
+  }
+
+  if (fix.valid.location)
+  {
+    gpsData.lat = fix.latitude();
+    gpsData.lng = fix.longitude();
+    gpsData.err_lat = ceil(fix.lat_err());
+    gpsData.err_lng = ceil(fix.lon_err());
+  }
+
+  if (fix.valid.altitude)
+  {
+    gpsData.alt = fix.altitude();
+  }
+
+  return gpsData;
+}
+
+void loadGpsHistory() {
   gps_log = FFat.open("/gps_log.bin");
   if (!gps_log) {
     Serial.println("There was an error opening the file for reading");
@@ -221,4 +232,24 @@ void loadGpsLog() {
   Serial.println("");
   gps_log.close();
   Serial.println("Read locations from file");
+}
+
+void storeGpsEntry(GpsData *entry) {
+  history_gps[history_index] = *entry;
+  history_index = (history_index + 1) % history_length;
+  
+  gps_log = FFat.open("/gps_log.bin", FILE_APPEND);
+  if (!gps_log) {
+    Serial.println("There was an error opening the file for writing");
+    return;
+  }
+  gps_log.write((uint8_t*) entry, sizeof(GpsData));
+  gps_log.close();
+}
+
+GpsData getPreviousEntry() {
+  int32_t i = history_index - 1;
+  if (i<0) i += history_length;
+  
+  return history_gps[i];
 }

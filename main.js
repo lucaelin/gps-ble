@@ -60,7 +60,8 @@ const mymap = L.map('mymap').setView([53.140, 8.23], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(mymap);
-const currentLocation = L.circle([0, 0], {radius: 50}).addTo(mymap);
+
+const currentLocation = L.ellipse([0, 0], [0, 0], 0, {}).addTo(mymap);
 console.log("currentLocation", currentLocation);
 
 const historyLine =L.polyline.antPath([], {
@@ -144,6 +145,16 @@ async function downloadHistory(chistory) {
   if(historyClean.length) console.log("since", Y2KtoDate(historyClean[0].time));
 
   historyClean.forEach(({lat, lng})=>historyLine.addLatLng([lat, lng]));
+
+  const gpsData = history[history.length-1];
+  if (!gpsData) return;
+
+  dom.status.textContent = GpsStatusLookup[gpsData.status];
+  if (gpsData.status < GpsStatus.STATUS_STD) return;
+
+  currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
+  console.log(gpsData);
+  currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
 }
 
 async function startContinuousUpdates(ccurrent) {
@@ -164,7 +175,7 @@ async function startContinuousUpdates(ccurrent) {
     if (gpsData.status < GpsStatus.STATUS_STD) return;
 
     currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
-    currentLocation.setRadius(Math.max(gpsData.errLat, gpsData.errLng) * 2);
+    currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
     historyLine.addLatLng([gpsData.lat, gpsData.lng]);
   }
   ccurrent.addEventListener('characteristicvaluechanged', (e)=>update(e.target.value));
