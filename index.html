@@ -23,28 +23,28 @@
           crossorigin=""></script>
         <script src="https://unpkg.com/leaflet-ellipse@0.9.1/l.ellipse.js" crossorigin=""></script>
         <script type="module" src="main.js" ></script>
+        <script type="module" src="wakelock.js" ></script>
     </head>
     <body>
       <h1>GPS-BLE</h1>
-      <div id="dev" class="card">
-        <div>device: </div>
-        <div>status: </div>
-        <div></div>
-        <div></div>
-        <span class="connect"><button name="connect">connect</button></span>
-        <span class="status">not connected</span>
-        <div></div>
-        <div></div>
+      <div id="dev" class="card h">
+        <div class="v">
+          <div>device: <span class="connect"><button name="connect">connect</button></span></div>
+          <div>status: <span class="status">not connected</span></div>
+        </div>
       </div>
-      <div id="gps" class="card">
-        <div>date: <span class="date">-</span></div>
-        <div>time: <span class="time">-</span></div>
-        <div>sats: <span class="sats">-</span></div>
-        <div></div>
-        <div>lat: <span class="lat">-</span></div>
-        <div>lng: <span class="lng">-</span></div>
-        <div>alt: <span class="alt">-</span></div>
-        <div>err 1σ: <span class="err">-</span></div>
+      <div id="gps" class="card h">
+        <div class="v">
+          <div>date: <span class="date">-</span></div>
+          <div>time: <span class="time">-</span></div>
+          <div>sats: <span class="sats">-</span></div>
+        </div>
+        <div class="v">
+          <div>lat: <span class="lat">-</span></div>
+          <div>lng: <span class="lng">-</span></div>
+          <div>alt: <span class="alt">-</span></div>
+          <div>err 1σ: <span class="err">-</span></div>
+        </div>
       </div>
       <div id="mymap"></div>
     </body>

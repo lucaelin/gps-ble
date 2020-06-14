@@ -143,12 +143,7 @@ void loop() {
   while (gps.available( Serial1 )) {
     GpsData previousGpsData = getPreviousEntry();
     GpsData gpsData = parseFix(gps.read());
-    
-    if (gpsData.status != previousGpsData.status) {
-      Serial.print("GPS status change: ");
-      Serial.println(gpsData.status);
-    }
-    
+   
     currentGPSCharacteristic->setValue((uint8_t*)&gpsData, sizeof(GpsData));
     currentGPSCharacteristic->notify();
     delay(3);
@@ -159,17 +154,12 @@ void loop() {
     float bearing = gpsData_location.BearingTo( previousGpsData_location );
     float travelled_lat = cos(bearing) * travelled;
     float travelled_lng = sin(bearing) * travelled;
-    Serial.print(travelled);
-    Serial.print(travelled_lat);
-    Serial.println(travelled_lng);
-
     if (gpsData.status < 3) continue;
     if (pointInEllipse(travelled_lat, travelled_lng, gpsData.err_lat * 2, gpsData.err_lng * 2)) continue;
 
     storeGpsEntry(&gpsData);
     
     Serial.println("Wrote location to history");
-
   }
 }
 
@@ -215,8 +205,47 @@ GpsData parseFix(gps_fix fix) {
   return gpsData;
 }
 
+boolean isGpsLogFile( const char *string )
+{
+  string = strrchr(string, '.');
+
+  if( string != NULL )
+    return ( strcmp(string, ".bin") == 0 );
+
+  return false;
+}
+File getLatestFile() {
+  File root = FFat.open("/");
+  if(!root){
+    Serial.println("- failed to open directory");
+    return root;
+  }
+  
+  File file = root.openNextFile();
+  const char *name = "/";
+  while(file){
+    Serial.print("Found file: ");
+    Serial.print(strcmp(file.name(), name));
+    Serial.println(file.name());
+    if(!file.isDirectory() && isGpsLogFile(file.name())){
+      if(strcmp(file.name(), name) > 0) {
+        name = file.name();
+      }
+    }
+
+    file.close();
+    file = root.openNextFile();
+  }
+
+  root.close();
+  
+  Serial.println("Found latest file: ");
+  Serial.println(name);
+  return FFat.open(name);
+}
+
 void loadGpsHistory() {
-  gps_log = FFat.open("/gps_log.bin");
+  File gps_log = getLatestFile();
   if (!gps_log) {
     Serial.println("There was an error opening the file for reading");
     return;
@@ -238,13 +267,22 @@ void storeGpsEntry(GpsData *entry) {
   history_gps[history_index] = *entry;
   history_index = (history_index + 1) % history_length;
   
-  gps_log = FFat.open("/gps_log.bin", FILE_APPEND);
+  NeoGPS::time_t time((clock_t) entry->time);
+  char str[11];
+  sprintf(str, "/%d.bin", time.days());
+
+  Serial.print("Writing gps to ");
+  Serial.println(str);
+  
+  gps_log = FFat.open(str, FILE_APPEND);
   if (!gps_log) {
     Serial.println("There was an error opening the file for writing");
     return;
   }
   gps_log.write((uint8_t*) entry, sizeof(GpsData));
   gps_log.close();
+  
+  Serial.printf("Free space: %10u\n", FFat.freeBytes());
 }
 
 GpsData getPreviousEntry() {

@@ -19,7 +19,8 @@ body {
     "h1" auto
     "dev" auto
     "gps" auto
-    "map" 1fr;
+    "map" 1fr /
+    1fr   ;
 }
 
 @media (min-width: 800px) {
@@ -53,13 +54,23 @@ h1 {
   margin: 0rem 1rem;
   padding: 0.5rem;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto auto auto;
-  grid-auto-flow: column;
   background-color: #EEF3;
   box-shadow: 3px 3px 6px black;
   font-family: 'ubuntu mono', monospace;
   white-space: pre;
+}
+
+.h {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  min-width: 0;
+}
+.v {
+  display: grid;
+  grid-auto-rows: 1fr;
+  grid-auto-flow: row;
+  min-width: 0;
 }
 
 #dev {
