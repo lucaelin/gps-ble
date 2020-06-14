@@ -9,7 +9,7 @@
           base-uri 'none';
           script-src 'self' https://unpkg.com/;
           connect-src 'self';
-          style-src 'self' https://unpkg.com/;
+          style-src 'self' 'unsafe-inline' https://unpkg.com/;
           img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com/;
           -require-trusted-types-for 'script';
           -upgrade-insecure-requests;
@@ -21,7 +21,7 @@
         <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
           integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
           crossorigin=""></script>
-        <script defer="defer" type="text/javascript" src="main.js" ></script>
+        <script type="module" src="main.js" ></script>
     </head>
     <body>
       <h1>GPS-BLE</h1>
@@ -29,17 +29,21 @@
         <div>device: </div>
         <div>status: </div>
         <div></div>
+        <div></div>
         <span class="connect"><button name="connect">connect</button></span>
         <span class="status">not connected</span>
+        <div></div>
         <div></div>
       </div>
       <div id="gps" class="card">
         <div>date: <span class="date">-</span></div>
         <div>time: <span class="time">-</span></div>
         <div>sats: <span class="sats">-</span></div>
+        <div></div>
         <div>lat: <span class="lat">-</span></div>
         <div>lng: <span class="lng">-</span></div>
         <div>alt: <span class="alt">-</span></div>
+        <div>err 1σ: <span class="err">-</span></div>
       </div>
       <div id="mymap"></div>
     </body>

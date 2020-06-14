@@ -1,3 +1,7 @@
+import 'https://unpkg.com/leaflet-ant-path@1.3.0/dist/leaflet-ant-path.js';
+import 'https://unpkg.com/@surma/structured-data-view@0.0.2/dist/structured-data-view.umd.js';
+const {StructuredDataView, ArrayOfStructuredDataViews} = structuredDataView;
+
 const connect = document.querySelector('button[name=connect]');
 
 const dom = {
@@ -10,6 +14,7 @@ const dom = {
   lat: document.querySelector('.lat'),
   lng: document.querySelector('.lng'),
   alt: document.querySelector('.alt'),
+  err: document.querySelector('.err'),
 }
 
 const ble = {
@@ -18,15 +23,51 @@ const ble = {
   history: "2e1d0003-cc74-4675-90a3-ec80f1037391",
 }
 
-function decodeText(data) {
-  var dec = new TextDecoder('utf-8');
-  var arr = new Uint8Array(data);
-  return dec.decode(arr);
+const GpsData = {
+  time:   StructuredDataView.Uint32({endianess: 'little'}),
+  status: StructuredDataView.Uint8({endianess: 'little'}),
+  sats:   StructuredDataView.Uint8({endianess: 'little'}),
+  errLat: StructuredDataView.Uint8({endianess: 'little'}),
+  errLng: StructuredDataView.Uint8({endianess: 'little'}),
+  lat:    StructuredDataView.Float32({endianess: 'little'}),
+  lng:    StructuredDataView.Float32({endianess: 'little'}),
+  alt:    StructuredDataView.Float32({endianess: 'little'}),
+};
+console.log(GpsData);
+
+const GpsStatus = {
+  STATUS_NONE: 0,
+  STATUS_EST: 1,
+  STATUS_TIME_ONLY: 2,
+  STATUS_STD: 3,
+  STATUS_DGPS: 4,
+  STATUS_RTK_FLOAT: 5,
+  STATUS_RTK_FIXED: 6,
+  STATUS_PPS: 7,
 }
-function encodeText(text) {
-  var enc = new TextEncoder();
-  return enc.encode(text);
+
+const GpsStatusLookup = Object.fromEntries(
+  Object.entries(GpsStatus).map(([k,v])=>[v,k])
+);
+
+function Y2KtoDate(t) {
+  const Y2K = 946684800;
+  return new Date((Y2K + t) * 1000);
 }
+
+const mymap = L.map('mymap').setView([53.140, 8.23], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(mymap);
+const currentLocation = L.circle([0, 0], {radius: 50}).addTo(mymap);
+console.log("currentLocation", currentLocation);
+
+const historyLine =L.polyline.antPath([], {
+  delay: 2000,
+}).addTo(mymap);
+console.log("historyLine", historyLine);
+
 
 const hopefullyDevice = new Promise((res, rej)=>{
   connect.addEventListener('click', async ()=>{
@@ -39,6 +80,10 @@ const hopefullyDevice = new Promise((res, rej)=>{
         optionalServices: Object.values(ble),
       });
 
+      device.addEventListener('gattserverdisconnected', ()=>{
+        console.warn("bluetooth connection lost");
+        dom.status.textContent = "connection lost!";
+      });
       res(device);
     } catch(e) {
       dom.status.textContent = e.message;
@@ -46,57 +91,88 @@ const hopefullyDevice = new Promise((res, rej)=>{
   });
 });
 
-const mymap = L.map('mymap').setView([53.140, 8.23], 13);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(mymap);
-const currentLocation = L.marker([0, 0]).addTo(mymap);
-
 
 (async function init() {
   try {
-    console.log('Waiting for device selection');
+    //console.log('Waiting for device selection');
     const device = await hopefullyDevice;
 
     dom.device.textContent = device.name;
     dom.status.textContent = 'connecting...';
 
-    console.log('Connecting to GATT Server...');
+    //console.log('Connecting to GATT Server...');
     const server = await device.gatt.connect();
 
-    console.log('Getting Service...');
+    //console.log('Getting Service...');
     const service = await server.getPrimaryServices(ble.service).then(s=>s[0]);
 
-    console.log('Getting Characteristics...');
+    //console.log('Getting Characteristics...');
     const ccurrent = await service.getCharacteristics(ble.current).then(c=>c[0]);
     const chistory = await service.getCharacteristics(ble.history).then(c=>c[0]);
 
-    console.log(ccurrent, chistory);
-    await ccurrent.startNotifications();
-    ccurrent.addEventListener('characteristicvaluechanged', (e)=>{
-      const v = e.target.value;
-      const [time, sats] = new Uint32Array(v.buffer);
-      const [lat, lng, alt] = new Float32Array(v.buffer).slice(2);
+    //console.log('Loading history...');
+    await downloadHistory(chistory);
 
-      // time is relative to Y2K
-      const Y2K = 946684800;
-      const date = new Date((Y2K + time) * 1000);
-
-      dom.date.textContent = date.toLocaleDateString();
-      dom.time.textContent = date.toLocaleTimeString();
-      dom.sats.textContent = sats;
-      dom.lat.textContent = lat.toFixed(5).padStart(9);
-      dom.lng.textContent = lng.toFixed(5).padStart(9);
-      dom.alt.textContent = alt.toFixed(1).padStart(5);
-      console.log(date, time, sats);
-      console.log(lat, lng, alt);
-      currentLocation.setLatLng([lat,lng]);
-
-      dom.status.textContent = lat === 0 && lng === 0 ? 'waiting for gps fix' : 'gps fix';
-    });
+    //console.log('Starting live update...');
+    await startContinuousUpdates(ccurrent);
   } catch(e) {
     console.error(e);
     dom.status.textContent = e.message;
   }
 })();
+
+async function downloadHistory(chistory) {
+  const historyChunks = [];
+  while(true) {
+    dom.status.textContent = "loading data... ("+historyChunks.length+")";
+    const historyBuffer = await chistory.readValue();
+    const chunk = new ArrayOfStructuredDataViews(historyBuffer.buffer, GpsData);
+    //console.log(chunk, historyBuffer.buffer.byteLength);
+    historyChunks.push(chunk);
+    if(!chunk.length) break;
+  }
+
+  //console.log("chunks", historyChunks);
+  const history = [].concat(...historyChunks);
+  //console.log(history);
+
+  const historyClean = history
+    .sort((a,b)=>a.time-b.time)
+    .filter(l=>l.status >= GpsStatus.STATUS_STD)
+
+  console.log("History consists of", historyClean.length, "points");
+  if(historyClean.length) console.log("since", Y2KtoDate(historyClean[0].time));
+
+  historyClean.forEach(({lat, lng})=>historyLine.addLatLng([lat, lng]));
+}
+
+async function startContinuousUpdates(ccurrent) {
+  const update = (v)=>{
+    const gpsData = new StructuredDataView(v.buffer, GpsData);
+
+    const date = Y2KtoDate(gpsData.time);
+
+    dom.date.textContent = date.toLocaleDateString();
+    dom.time.textContent = date.toLocaleTimeString();
+    dom.sats.textContent = gpsData.sats;
+    dom.lat.textContent = gpsData.lat.toFixed(5).padStart(9);
+    dom.lng.textContent = gpsData.lng.toFixed(5).padStart(9);
+    dom.alt.textContent = gpsData.alt.toFixed(1).padStart(5);
+    dom.err.textContent = gpsData.errLat.toFixed(0).padStart(3) + " " + gpsData.errLng.toFixed(0).padStart(3);
+
+    dom.status.textContent = GpsStatusLookup[gpsData.status];
+    if (gpsData.status < GpsStatus.STATUS_STD) return;
+
+    currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
+    currentLocation.setRadius(Math.max(gpsData.errLat, gpsData.errLng) * 2);
+    historyLine.addLatLng([gpsData.lat, gpsData.lng]);
+  }
+  ccurrent.addEventListener('characteristicvaluechanged', (e)=>update(e.target.value));
+  await ccurrent.startNotifications().catch(async e=>{
+    console.log('fallback to interval based polling');
+    update(await ccurrent.readValue());
+    window.setInterval(async ()=>{
+      update(await ccurrent.readValue());
+    }, 5000)
+  });
+}
