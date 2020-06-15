@@ -26,18 +26,9 @@ class MyServerCallbacks: public BLEServerCallbacks {
 class GpsCallbacks: public BLECharacteristicCallbacks {
   void onRead (BLECharacteristic *pCharacteristic) {
     uint32_t max_entries = floor(CHARACTERISTIC_MTU / sizeof(GpsData));
-    //Serial.print("max_entries: ");
-    //Serial.println(max_entries);
-    //Serial.print("history_length: ");
-    //Serial.println(history_length);
-    //Serial.print("history_transfer_index: ");
-    //Serial.println(history_transfer_index);
     uint32_t num_entries = min(max_entries, history_length-history_transfer_index);
-    //Serial.print("num_entries: ");
-    //Serial.println(num_entries);
     pCharacteristic->setValue((uint8_t*)&history_gps[history_transfer_index], num_entries * sizeof(GpsData));
     history_transfer_index += num_entries;
-    //Serial.println("Transmission complete");
   }
 };
 
@@ -53,7 +44,13 @@ class StatusCallbacks: public BLECharacteristicCallbacks {
     sts.history_length = history_length;
     
     File latestLogFile = getLatestFile();
+    Serial.print("Latest file: ");
+    Serial.println(latestLogFile.name());
     strcpy(sts.logFile, latestLogFile.name());
+
+    Serial.print("Latest file size: ");
+    Serial.println(latestLogFile.size());
+    sts.logFileSize = latestLogFile.size();
     
     pCharacteristic->setValue( (uint8_t*)&sts, sizeof(StatusData) );
   }

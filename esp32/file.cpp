@@ -69,7 +69,7 @@ void deleteOldestFile() {
 
   root.close();
   
-  Serial.println("Found latest file: ");
+  Serial.println("Found oldest file: ");
   Serial.println(name);
   
   if(FFat.remove(name)){

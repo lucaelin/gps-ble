@@ -24,7 +24,8 @@ __attribute__((packed)) struct StatusData {
   uint32_t flash_total;
   uint32_t flash_free;
   uint32_t history_length;
-  char logFile[11];
+  char logFile[12];
+  uint32_t logFileSize;
 };
 
 const uint32_t history_length = 1000;

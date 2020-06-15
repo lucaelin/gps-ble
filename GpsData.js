@@ -4,8 +4,10 @@ export const StatusData = {
   flash_total:    StructuredDataView.Uint32({endianess: 'little'}),
   flash_free:     StructuredDataView.Uint32({endianess: 'little'}),
   history_length: StructuredDataView.Uint32({endianess: 'little'}),
-  logFile: StructuredDataView.UTF8String(11),
+  logFile:        StructuredDataView.UTF8String(12),
+  logFileSize:    StructuredDataView.Uint32({endianess: 'little'}),
 }
+console.log(StatusData);
 
 export const GpsData = {
   time:   StructuredDataView.Uint32({endianess: 'little'}),

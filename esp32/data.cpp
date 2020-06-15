@@ -49,17 +49,19 @@ void loadGpsHistory() {
     Serial.println("There was an error opening the file for reading");
     return;
   }
+  uint32_t count = 0;
   while (gps_log.available()) {
     GpsData new_gps;
     if(!gps_log.read((uint8_t*) &new_gps, sizeof(GpsData))) continue;
 
     history_gps[history_index] = new_gps;
     history_index = (history_index + 1) % history_length;
-    Serial.print(".");
+    count++;
   }
-  Serial.println("");
   gps_log.close();
-  Serial.println("Read locations from file");
+  Serial.print("Read ");
+  Serial.print(count);
+  Serial.println(" locations from file");
 }
 
 void storeGpsEntry(GpsData *entry) {

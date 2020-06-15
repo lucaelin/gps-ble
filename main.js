@@ -111,6 +111,7 @@ async function startContinuousUpdates(ccurrent) {
 
 async function getStatus(cstatus) {
   const {buffer} = await cstatus.readValue();
+  console.log(buffer);
   const statusData = new StructuredDataView(buffer, StatusData);
   console.log(JSON.stringify(statusData, null, 4));
 }
