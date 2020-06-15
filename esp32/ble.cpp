@@ -8,13 +8,12 @@ BLECharacteristic *currentGPSCharacteristic;
 BLECharacteristic *historyGPSCharacteristic;
 BLECharacteristic *statusCharacteristic;
 
-uint32_t history_transfer_index;
-
+uint32_t history_position;
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       Serial.println("BLE connected");
-      history_transfer_index = 0;
+      history_position = floor( getLatestFile().size() / sizeof(GpsData) ) * sizeof(GpsData);
     };
 
     void onDisconnect(BLEServer* pServer) {
@@ -25,10 +24,34 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
 class GpsCallbacks: public BLECharacteristicCallbacks {
   void onRead (BLECharacteristic *pCharacteristic) {
-    uint32_t max_entries = floor(CHARACTERISTIC_MTU / sizeof(GpsData));
-    uint32_t num_entries = min(max_entries, history_length-history_transfer_index);
-    pCharacteristic->setValue((uint8_t*)&history_gps[history_transfer_index], num_entries * sizeof(GpsData));
-    history_transfer_index += num_entries;
+    File history = getLatestFile();
+
+    Serial.print("history_position: ");
+    Serial.println(history_position);
+    
+    uint32_t max_chunk_size = floor(CHARACTERISTIC_MTU / sizeof(GpsData)) * sizeof(GpsData);
+
+    if (history_position < max_chunk_size) max_chunk_size = history_position;
+    history_position -= max_chunk_size;
+    
+    Serial.print("read starting at: ");
+    Serial.println(history_position);
+    
+    Serial.print("read length: ");
+    Serial.println(max_chunk_size);
+    
+    history.seek(history_position);
+
+    if (!max_chunk_size) {
+      pCharacteristic->setValue("");
+      return;
+    }
+    
+    uint8_t buffer[max_chunk_size];
+    history.read(buffer, max_chunk_size);
+    history.close();
+    
+    pCharacteristic->setValue(buffer, max_chunk_size);
   }
 };
 

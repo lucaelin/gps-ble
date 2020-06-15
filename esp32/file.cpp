@@ -24,7 +24,7 @@ File getLatestFile() {
     Serial.print("Found file: ");
     Serial.print(strcmp(file.name(), name));
     Serial.println(file.name());
-    if(!file.isDirectory() && isGpsLogFile(file.name())){
+    if(!file.isDirectory() && isGpsLogFile(file.name())) {
       if(!found || strcmp(file.name(), name) > 0) {
         name = file.name();
         found = true;

@@ -58,11 +58,12 @@ const hopefullyDevice = new Promise((res, rej)=>{
 
     await getStatus(cstatus);
 
+    //console.log('Starting live update...');
+    await startContinuousUpdates(ccurrent);
+
     //console.log('Loading history...');
     await downloadHistory(chistory);
 
-    //console.log('Starting live update...');
-    await startContinuousUpdates(ccurrent);
   } catch(e) {
     console.error(e);
     dom.status.textContent = e.message;
@@ -70,34 +71,26 @@ const hopefullyDevice = new Promise((res, rej)=>{
 })();
 
 async function downloadHistory(chistory) {
-  const historyChunks = [];
+  let count = 0;
   while(true) {
-    dom.status.textContent = "loading data... ("+historyChunks.length+")";
+    dom.status.textContent = "loading data... ("+count+")";
     const historyBuffer = await chistory.readValue();
+    if (!historyBuffer.byteLength) break;
     const chunk = new ArrayOfStructuredDataViews(historyBuffer.buffer, GpsData);
-    //console.log(chunk, historyBuffer.buffer.byteLength);
-    historyChunks.push(chunk);
-    if(!chunk.length) break;
+
+    plotPath(chunk
+      .filter(l=>l.status >= GpsStatus.STATUS_STD)
+      .sort((a,b)=>a.time-b.time)
+    );
+    count += chunk.length;
   }
-
-  //console.log("chunks", historyChunks);
-  const history = [].concat(...historyChunks);
-  //console.log(history);
-
-  const historyClean = history
-    .filter(l=>l.status >= GpsStatus.STATUS_STD)
-    .sort((a,b)=>a.time-b.time)
-
-  console.log("History consists of", historyClean.length, "points");
-  if(historyClean.length) console.log("since", Y2KtoDate(historyClean[0].time));
-
-  plotPath(historyClean);
+  dom.status.textContent = "loading data complete ("+count+")";
 }
 
 async function startContinuousUpdates(ccurrent) {
   const update = (v)=>{
     const gpsData = new StructuredDataView(v.buffer, GpsData);
-    plotPosition(gpsData);
+    plotPosition(gpsData, true);
   }
   ccurrent.addEventListener('characteristicvaluechanged', (e)=>update(e.target.value));
   await ccurrent.startNotifications().catch(async e=>{

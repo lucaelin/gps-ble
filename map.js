@@ -24,7 +24,7 @@ function setUi(name, value, valid=true) {
 
 const colors = [
   "#FF0000",
-  "#FFFF00",
+  "#FF8800",
   "#00FF00",
   "#00FFFF",
   "#0000FF",
@@ -46,44 +46,65 @@ createPath();
 console.log("paths", paths);
 
 function createPath() {
-  const path = L.polyline.antPath([], {
+  const ants = L.polyline.antPath([], {
     delay: 2000,
     color: colors[paths.length % colors.length],
   }).addTo(mymap);
-  paths.unshift({path});
+  paths.unshift({ants, data: []});
 }
 
-export function plotPosition(gpsData) {
+export function plotPosition(gpsData, realtime=false) {
   const date = Y2KtoDate(gpsData.time);
   const hasFix = gpsData.status >= GpsStatus.STATUS_STD;
 
-  setUi('date', date.toLocaleDateString(), gpsData.time);
-  setUi('time', date.toLocaleTimeString(), gpsData.time);
-  setUi('sats', gpsData.sats);
+  if (realtime) {
+    setUi('date', date.toLocaleDateString(), gpsData.time);
+    setUi('time', date.toLocaleTimeString(), gpsData.time);
+    setUi('sats', gpsData.sats);
 
-  setUi('lat', gpsData.lat.toFixed(5).padStart(9), hasFix);
-  setUi('lng', gpsData.lng.toFixed(5).padStart(9), hasFix);
-  setUi('alt', gpsData.alt.toFixed(1).padStart(5), hasFix);
+    setUi('lat', gpsData.lat.toFixed(5).padStart(9), hasFix);
+    setUi('lng', gpsData.lng.toFixed(5).padStart(9), hasFix);
+    setUi('alt', gpsData.alt.toFixed(1).padStart(5), hasFix);
 
-  setUi('err', gpsData.errLat.toFixed(0).padStart(3) + " " + gpsData.errLng.toFixed(0).padStart(3), hasFix && gpsData.errLat);
+    setUi('err', gpsData.errLat.toFixed(0).padStart(3) + " " + gpsData.errLng.toFixed(0).padStart(3), hasFix && gpsData.errLat);
 
-  setUi('status', GpsStatusLookup[gpsData.status]);
+    setUi('status', GpsStatusLookup[gpsData.status]);
+  }
 
   if (!hasFix) return;
 
-  if (
-    paths[0].latest && paths[0].latest.time < gpsData.time - 10*60 ||
-    paths[0].latest && distance(gpsData, paths[0].latest) > 1000
-  ) createPath();
+  let path = paths.find((p)=>{
+    if (!p.data.length) return false;
+    const start = p.data[0];
+    const end = p.data[p.data.length - 1];
+    return (
+      start.time < gpsData.time + 10*60 &&
+      end.time > gpsData.time - 10*60
+    );
+  });
 
-  paths[0].path.addLatLng([gpsData.lat, gpsData.lng]);
-  paths[0].latest = gpsData;
+  if (!path) {
+    createPath();
+    path = paths[0];
+  }
 
-  currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
-  currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
+  // TODO optimize to insert at correct position instead of sorting
+  path.data.push(gpsData);
+  path.data = path.data
+    .filter(l=>l.status >= GpsStatus.STATUS_STD)
+    .sort((a,b)=>a.time-b.time);
 
-  if (mymap.distance(mymap.getCenter(), [gpsData.lat, gpsData.lng]) < 1400/mymap.getZoom()) {
-    mymap.setView([gpsData.lat, gpsData.lng], mymap.getZoom());
+  path.ants.setLatLngs(
+    path.data.map(({lat, lng})=>[lat, lng])
+  );
+
+  if (realtime) {
+    currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
+    currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
+
+    if (mymap.distance(mymap.getCenter(), [gpsData.lat, gpsData.lng]) < 1400/mymap.getZoom()) {
+      mymap.setView([gpsData.lat, gpsData.lng], mymap.getZoom());
+    }
   }
 }
 export function plotPath(path) {
