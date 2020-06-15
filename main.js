@@ -3,14 +3,15 @@ import 'https://unpkg.com/@surma/structured-data-view@0.0.2/dist/structured-data
 const {StructuredDataView, ArrayOfStructuredDataViews} = structuredDataView;
 
 import {plotPath, plotPosition, dom} from './map.js';
-import {GpsData, GpsStatus, Y2KtoDate} from './GpsData.js';
+import {StatusData, GpsData, GpsStatus, Y2KtoDate} from './GpsData.js';
 
 const connect = document.querySelector('button[name=connect]');
 
 const ble = {
-  service: "2e1d0001-cc74-4675-90a3-ec80f1037391",
-  current: "2e1d0002-cc74-4675-90a3-ec80f1037391",
-  history: "2e1d0003-cc74-4675-90a3-ec80f1037391",
+  service: "2e2d0001-cc74-4675-90a3-ec80f1037391",
+  current: "2e2d0002-cc74-4675-90a3-ec80f1037391",
+  history: "2e2d0003-cc74-4675-90a3-ec80f1037391",
+  status:  "2e2d0004-cc74-4675-90a3-ec80f1037391",
 }
 
 const hopefullyDevice = new Promise((res, rej)=>{
@@ -53,6 +54,9 @@ const hopefullyDevice = new Promise((res, rej)=>{
     //console.log('Getting Characteristics...');
     const ccurrent = await service.getCharacteristics(ble.current).then(c=>c[0]);
     const chistory = await service.getCharacteristics(ble.history).then(c=>c[0]);
+    const cstatus = await service.getCharacteristics(ble.status).then(c=>c[0]);
+
+    await getStatus(cstatus);
 
     //console.log('Loading history...');
     await downloadHistory(chistory);
@@ -103,4 +107,10 @@ async function startContinuousUpdates(ccurrent) {
       update(await ccurrent.readValue());
     }, 5000)
   });
+}
+
+async function getStatus(cstatus) {
+  const {buffer} = await cstatus.readValue();
+  const statusData = new StructuredDataView(buffer, StatusData);
+  console.log(JSON.stringify(statusData, null, 4));
 }

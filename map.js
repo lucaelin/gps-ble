@@ -32,6 +32,7 @@ const colors = [
 ]
 
 const mymap = L.map('mymap').setView([53.140, 8.23], 13);
+console.log("map", mymap);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -80,7 +81,10 @@ export function plotPosition(gpsData) {
 
   currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
   currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
-  mymap.setView([gpsData.lat, gpsData.lng], 16);
+
+  if (mymap.distance(mymap.getCenter(), [gpsData.lat, gpsData.lng]) < 1400/mymap.getZoom()) {
+    mymap.setView([gpsData.lat, gpsData.lng], mymap.getZoom());
+  }
 }
 export function plotPath(path) {
   path.forEach((p)=>plotPosition(p));

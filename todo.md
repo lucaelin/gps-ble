@@ -7,7 +7,7 @@
   - [x] wakelock
 
 ## HW
-  - [ ] store history in file based on date
+  - [x] store history in file based on date
 
   - [ ] delete old files if remaining space gets low
 

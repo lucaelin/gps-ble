@@ -1,5 +1,12 @@
 const {StructuredDataView} = structuredDataView;
 
+export const StatusData = {
+  flash_total:    StructuredDataView.Uint32({endianess: 'little'}),
+  flash_free:     StructuredDataView.Uint32({endianess: 'little'}),
+  history_length: StructuredDataView.Uint32({endianess: 'little'}),
+  logFile: StructuredDataView.UTF8String(11),
+}
+
 export const GpsData = {
   time:   StructuredDataView.Uint32({endianess: 'little'}),
   status: StructuredDataView.Uint8({endianess: 'little'}),
