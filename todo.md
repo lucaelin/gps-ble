@@ -9,6 +9,6 @@
 ## HW
   - [x] store history in file based on date
 
-  - [ ] delete old files if remaining space gets low
+  - [x] delete old files if remaining space gets low
 
   - [ ] add wifi download (?)

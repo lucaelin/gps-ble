@@ -7,5 +7,6 @@
 
 bool isGpsLogFile( const char* );
 File getLatestFile();
+void deleteOldestFile();
 
 #endif

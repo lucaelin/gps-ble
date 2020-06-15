@@ -42,11 +42,11 @@ File getLatestFile() {
   return FFat.open(name);
 }
 
-File getOldestFile() {
+void deleteOldestFile() {
   File root = FFat.open("/");
   if(!root){
     Serial.println("- failed to open directory");
-    return root;
+    return;
   }
 
   bool found = false;
@@ -71,5 +71,10 @@ File getOldestFile() {
   
   Serial.println("Found latest file: ");
   Serial.println(name);
-  return FFat.open(name);
+  
+  if(FFat.remove(name)){
+      Serial.println("- file deleted");
+  } else {
+      Serial.println("- failed to delete");
+  }
 }

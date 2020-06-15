@@ -82,6 +82,11 @@ void storeGpsEntry(GpsData *entry) {
   gps_log.close();
 
   Serial.printf("Free space: %10u\n", FFat.freeBytes());
+
+  while (FFat.freeBytes() < sizeof(GpsData) * 1024) {
+    Serial.printf("Free space below threshold, deleting old logs");
+    deleteOldestFile();
+  }
 }
 
 GpsData getPreviousEntry() {
