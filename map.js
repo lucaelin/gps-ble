@@ -89,10 +89,14 @@ export function plotPosition(gpsData, realtime=false) {
   }
 
   // TODO optimize to insert at correct position instead of sorting
-  path.data.push(gpsData);
-  path.data = path.data
-    .filter(l=>l.status >= GpsStatus.STATUS_STD)
-    .sort((a,b)=>a.time-b.time);
+  if (path.data[path.data.length].time < gpsData.time) {
+    path.data.push(gpsData);
+  } else if (gpsData.time < path.data[0].time) {
+    path.data.unshift(gpsData);
+  } else {
+    path.data.push(gpsData);
+    path.data = path.data.sort((a,b)=>a.time-b.time);
+  }
 
   path.ants.setLatLngs(
     path.data.map(({lat, lng})=>[lat, lng])

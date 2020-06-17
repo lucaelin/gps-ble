@@ -23,6 +23,8 @@ const unsigned char ubxSpeed2000ms[] PROGMEM =
   { 0x06,0x08,0x06,0x00,0xd0,0x07,0x01,0x00,0x01,0x00 };
 const unsigned char ubxSpeed1000ms[] PROGMEM = 
   { 0x06,0x08,0x06,0x00,0xE8,0x03,0x01,0x00,0x01,0x00 };
+
+uint32_t skippedUpdates = 0;
   
 void sendUBX( const unsigned char *progmemBytes, size_t len )
 {
@@ -39,6 +41,8 @@ void sendUBX( const unsigned char *progmemBytes, size_t len )
 
   Serial1.write( a ); // CHECKSUM A
   Serial1.write( b ); // CHECKSUM B
+
+  delay(10);
 
 } // sendUBX
   
@@ -88,8 +92,17 @@ void loop() {
     float bearing = gpsData_location.BearingTo( previousGpsData_location );
     float travelled_lat = cos(bearing) * travelled;
     float travelled_lng = sin(bearing) * travelled;
+    
     if (gpsData.status < 3) continue;
+
+    skippedUpdates++;
+    if (skippedUpdates == 60) sendUBX( ubxSpeed4000ms, sizeof(ubxSpeed4000ms) );
+    if (skippedUpdates == 200) sendUBX( ubxSpeed10000ms, sizeof(ubxSpeed10000ms) );
+    
     if (pointInEllipse(travelled_lat, travelled_lng, gpsData.err_lat * 2, gpsData.err_lng * 2)) continue;
+
+    if (skippedUpdates > 2) sendUBX( ubxSpeed2000ms, sizeof(ubxSpeed2000ms) );
+    skippedUpdates = 0;
 
     storeGpsEntry(&gpsData);
 
