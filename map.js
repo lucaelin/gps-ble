@@ -91,7 +91,7 @@ export function plotPosition(gpsData, realtime=false) {
   // TODO optimize to insert at correct position instead of sorting
   if (!path.data.length) {
     path.data.push(gpsData);
-  } else if (path.data[path.data.length].time < gpsData.time) {
+  } else if (path.data[path.data.length - 1].time < gpsData.time) {
     path.data.push(gpsData);
   } else if (gpsData.time < path.data[0].time) {
     path.data.unshift(gpsData);
