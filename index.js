@@ -20,4 +20,4 @@ app.get('/data', async (req, res)=>{
 
 app.use(express.static('client'));
 
-app.listen(3030);
+app.listen(process.env.PORT, ()=>console.log('listening on port', process.env.PORT));
