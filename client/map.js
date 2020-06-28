@@ -116,3 +116,8 @@ export function plotPosition(gpsData, realtime=false) {
 export function plotPath(path) {
   path.forEach((p)=>plotPosition(p));
 }
+
+export function plotStop(gpsData) {
+  const date = Y2KtoDate(gpsData.time);
+  L.marker([gpsData.lat, gpsData.lng], {title: 'stopped at '+date.toLocaleString()}).addTo(mymap);
+}

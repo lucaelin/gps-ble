@@ -1,0 +1,2 @@
+TTN_ACCESS_TOKEN=ttn-account-v2.somethingsomething
+TTN_STORAGE_API=https://myproject.data.thethingsnetwork.org/api/v2/query?last=2d

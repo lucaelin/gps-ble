@@ -2,8 +2,10 @@ import 'https://unpkg.com/leaflet-ant-path@1.3.0/dist/leaflet-ant-path.js';
 import 'https://unpkg.com/@surma/structured-data-view@0.0.2/dist/structured-data-view.umd.js';
 const {StructuredDataView, ArrayOfStructuredDataViews} = structuredDataView;
 
-import {plotPath, plotPosition, dom} from './map.js';
+import {plotPath, plotPosition, plotStop, dom} from './map.js';
 import {StatusData, GpsData, GpsStatus, Y2KtoDate} from './GpsData.js';
+
+//import './test.js';
 
 const connect = document.querySelector('button[name=connect]');
 
@@ -39,6 +41,9 @@ const hopefullyDevice = new Promise((res, rej)=>{
 
 (async function init() {
   try {
+    dom.status.textContent = 'loading TTN data...';
+    await downloadTTNData();
+    dom.status.textContent = 'Ready to connect';
     //console.log('Waiting for device selection');
     const device = await hopefullyDevice;
 
@@ -107,4 +112,18 @@ async function getStatus(cstatus) {
   console.log(buffer);
   const statusData = new StructuredDataView(buffer, StatusData);
   console.log(JSON.stringify(statusData, null, 4));
+}
+
+async function downloadTTNData() {
+  const data = await fetch('./data').then(res=>res.json()).catch(e=>{
+    console.warn('did not get data response from backend..', e);
+    return [];
+  });
+
+  if(!data.length) return;
+
+  const buffers = data.map(({raw})=>Uint8Array.from(atob(raw), c => c.charCodeAt(0)).buffer);
+  const locations = buffers.map(b=>new StructuredDataView(b, GpsData)).filter(l=>l.status);
+
+  locations.forEach(l=>plotStop(l));
 }

@@ -4,11 +4,15 @@
 
   - [x] center map on latest position
 
+  - [ ] add button to jump to latest
+
   - [x] wakelock
 
 ## HW
   - [x] store history in file based on date
 
   - [x] delete old files if remaining space gets low
+
+  - [ ] reduce stored location by omitting straight lines
 
   - [ ] add wifi download (?)

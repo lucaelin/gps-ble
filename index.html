@@ -1,51 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>Title</title>
+        <title>GPS-BLE</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta http-equiv="Content-Security-Policy" content="
-          default-src 'none';
-          base-uri 'none';
-          script-src 'self' https://unpkg.com/;
-          connect-src 'self';
-          style-src 'self' 'unsafe-inline' https://unpkg.com/;
-          img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com/;
-          -require-trusted-types-for 'script';
-          -upgrade-insecure-requests;
-        " />
-        <link rel="stylesheet" type="text/css" href="style.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
-          integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
-          crossorigin=""/>
-        <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
-          integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
-          crossorigin=""></script>
-        <script src="https://unpkg.com/leaflet-ellipse@0.9.1/l.ellipse.js" crossorigin=""></script>
-        <script type="module" src="main.js" ></script>
-        <script type="module" src="wakelock.js" ></script>
+        <meta http-equiv="refresh" content="3; URL=./client">
     </head>
     <body>
       <h1>GPS-BLE</h1>
-      <div id="dev" class="card h">
-        <div class="v">
-          <div>device: <span class="connect"><button name="connect">connect</button></span></div>
-          <div>status: <span class="status">not connected</span></div>
-        </div>
-      </div>
-      <div id="gps" class="card h">
-        <div class="v">
-          <div>date: <span class="date">-</span></div>
-          <div>time: <span class="time">-</span></div>
-          <div>sats: <span class="sats">-</span></div>
-        </div>
-        <div class="v">
-          <div>lat: <span class="lat">-</span></div>
-          <div>lng: <span class="lng">-</span></div>
-          <div>alt: <span class="alt">-</span></div>
-          <div>err 1σ: <span class="err">-</span></div>
-        </div>
-      </div>
-      <div id="mymap"></div>
+      <p>Using the static host version</p>
+      <p>This version does <b>not</b> include data from TTN</p>
+      <p>You are being redirected...</p>
     </body>
 </html>

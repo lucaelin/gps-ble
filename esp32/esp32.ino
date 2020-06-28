@@ -7,36 +7,60 @@
 #include "file.h"
 #include "ble.h"
 
+#define TBEAM
+
+#ifdef TBEAM
+static const int RXPin = 34, TXPin = 12;
+#else
 static const int RXPin = 14, TXPin = 12;
+#endif
 static const uint32_t GPSBaud = 9600;
 
 NMEAGPS gps;
 
-// https://www.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_(GPS.G6-SW-10018)_Public.pdf?utm_source=en/images/downloads/Product_Docs/u-blox6_ReceiverDescriptionProtocolSpec_(GPS.G6-SW-10018).pdf 
+GpsData lastStoredGps;
+NeoGPS::Location_t lastStoredLocation;
+GpsData previousGps;
+NeoGPS::Location_t previousLocation;
+GpsData currentGps;
+NeoGPS::Location_t currentLocation;
+
+#ifdef TBEAM
+#include "axp20x.h"
+AXP20X_Class axp;
+#define I2C_SDA         21
+#define I2C_SCL         22
+#endif
+
+// https://www.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_(GPS.G6-SW-10018)_Public.pdf?utm_source=en/images/downloads/Product_Docs/u-blox6_ReceiverDescriptionProtocolSpec_(GPS.G6-SW-10018).pdf
 // page 138
 // or https://github.com/SlashDevin/NeoGPS/blob/master/examples/ubloxRate/ubloxRate.ino#L130
-const unsigned char ubxSpeed10000ms[] PROGMEM = 
-  { 0x06,0x08,0x06,0x00,0x10,0x27,0x01,0x00,0x01,0x00 };
-const unsigned char ubxSpeed4000ms[] PROGMEM = 
-  { 0x06,0x08,0x06,0x00,0xA0,0x0F,0x01,0x00,0x01,0x00 };
-const unsigned char ubxSpeed2000ms[] PROGMEM = 
-  { 0x06,0x08,0x06,0x00,0xd0,0x07,0x01,0x00,0x01,0x00 };
-const unsigned char ubxSpeed1000ms[] PROGMEM = 
-  { 0x06,0x08,0x06,0x00,0xE8,0x03,0x01,0x00,0x01,0x00 };
+char ubxSpeed[] =
+{ 0x06, 0x08, 0x06, 0x00, 0xd0, 0x07, 0x01, 0x00, 0x01, 0x00 };
 
-uint32_t skippedUpdates = 0;
-  
-void sendUBX( const unsigned char *progmemBytes, size_t len )
+void setUBXSpeed(uint16_t ms) {
+  ubxSpeed[4] = ((uint8_t*)&ms)[0];
+  ubxSpeed[5] = ((uint8_t*)&ms)[1];
+  sendUBX(ubxSpeed, 10);
+  Serial.print("Setting ubx speed to ");
+  Serial.println((int) ms);
+}
+
+uint32_t stationaryUpdates = 0;
+float lineDeviation = 0;
+
+void sendUBX( char *bytes, size_t len )
 {
   Serial1.write( 0xB5 ); // SYNC1
   Serial1.write( 0x62 ); // SYNC2
 
   uint8_t a = 0, b = 0;
-  while (len-- > 0) {
-    uint8_t c = pgm_read_byte( progmemBytes++ );
+  uint8_t i = 0;
+  while (i < len) {
+    uint8_t c = bytes[i];
     a += c;
     b += a;
-    Serial1.write( c );
+    i++;
   }
 
   Serial1.write( a ); // CHECKSUM A
@@ -45,22 +69,95 @@ void sendUBX( const unsigned char *progmemBytes, size_t len )
   delay(10);
 
 } // sendUBX
-  
+
+bool isStationary(NeoGPS::Location_t a, NeoGPS::Location_t b, uint8_t err_lat, uint8_t err_lng) {
+  // calculate distances
+  float travelled = a.DistanceKm( b ) * 1000;
+  float bearing = a.BearingTo( b );
+  float travelled_lat = cos(bearing) * travelled;
+  float travelled_lng = sin(bearing) * travelled;
+
+  // check if stationary
+  return pointInEllipse(travelled_lat, travelled_lng, err_lat * 2, err_lng * 2);
+}
+
+float calcDeviation(NeoGPS::Location_t a, NeoGPS::Location_t b, NeoGPS::Location_t c) {
+  //Serial.println("calcDeviation");
+  float bearing_ab = PI - a.BearingTo(b);
+  //Serial.print("ab: ");
+  //Serial.println(bearing_ab);
+  float bearing_ac = PI - a.BearingTo(c);
+  //Serial.print("ac: ");
+  //Serial.println(bearing_ac);
+  float bearing_diff = bearing_ab - bearing_ac;
+  //Serial.print("diff: ");
+  //Serial.println(bearing_diff);
+  float bearing_mod = bearing_diff + (bearing_diff / abs(bearing_diff)) * (-2.0 * PI);
+  //Serial.print("mod: ");
+  //Serial.println(bearing_mod);
+  float bearing_change = bearing_diff > PI || bearing_diff < -PI ? bearing_mod : bearing_diff;
+  //Serial.print("change: ");
+  //Serial.println(bearing_change);
+  float distance_ac = a.DistanceKm(b) * 1000;
+  //Serial.print("ac_dist: ");
+  //Serial.println(distance_ac);
+  float offset = sin(bearing_change) * distance_ac;
+  //Serial.print("offset: ");
+  //Serial.println(offset);
+  return offset;
+}
+
 void setup() {
   Serial.begin(115200);
-  Serial1.begin(GPSBaud, (uint32_t) SERIAL_8N1, 14, 12);
+
+#ifdef TBEAM
+  Serial.println("TBEAM PMU setup");
+  Wire.begin(I2C_SDA, I2C_SCL);
+  axp.begin(Wire, AXP192_SLAVE_ADDRESS);
+  axp.setPowerOutPut(AXP192_LDO2, AXP202_ON);  // lora
+  axp.setPowerOutPut(AXP192_EXTEN, AXP202_ON); // maybe related to lora
+  axp.setPowerOutPut(AXP192_LDO3, AXP202_ON);  // gps
+  axp.setPowerOutPut(AXP192_DCDC2, AXP202_ON); // ?
+  axp.setPowerOutPut(AXP192_DCDC1, AXP202_ON); // OLED pins + some other
+  axp.setDCDC1Voltage(3300);
+
+  Serial.printf("DCDC1: %s\n", axp.isDCDC1Enable() ? "ENABLE" : "DISABLE");
+  Serial.printf("DCDC2: %s\n", axp.isDCDC2Enable() ? "ENABLE" : "DISABLE");
+  Serial.printf("LDO2: %s\n", axp.isLDO2Enable() ? "ENABLE" : "DISABLE");
+  Serial.printf("LDO3: %s\n", axp.isLDO3Enable() ? "ENABLE" : "DISABLE");
+  Serial.printf("DCDC3: %s\n", axp.isDCDC3Enable() ? "ENABLE" : "DISABLE");
+  Serial.printf("Exten: %s\n", axp.isExtenEnable() ? "ENABLE" : "DISABLE");
+
+  delay(1000);
+  setupTTN();
+#endif
+
+
+  Serial1.begin(GPSBaud, (uint32_t) SERIAL_8N1, RXPin, TXPin);
 
   // include location error data (GST sentences)
-  delay(100);
+  delay(1000);
   gps.send_P( &Serial1, F("PUBX,40,GST,0,1,0,0,0,0") );
   delay(100);
-  sendUBX( ubxSpeed2000ms, sizeof(ubxSpeed2000ms) );
+  /*
+    Serial1.println(F("$PUBX,40,VTG,0,0,0,0*5E")); //VTG OFF
+    delay(100);
+    Serial1.println(F("$PUBX,40,GGA,0,0,0,0*5A")); //GGA OFF
+    delay(100);
+    Serial1.println(F("$PUBX,40,GSA,0,0,0,0*4E")); //GSA OFF
+    delay(100);
+    Serial1.println(F("$PUBX,40,GSV,0,0,0,0*59")); //GSV OFF
+    delay(100);
+    Serial1.println(F("$PUBX,40,GLL,0,0,0,0*5C")); //GLL OFF
+    delay(100);
+  */
+  setUBXSpeed(2000);
 
   delay(1000);
 
   //FFat.format();
   Serial.setDebugOutput(true);
-  if(!FFat.begin(true)){
+  if (!FFat.begin(true)) {
     Serial.println("FFat Mount Failed");
     return;
   }
@@ -78,34 +175,65 @@ void setup() {
 
 void loop() {
   while (gps.available( Serial1 )) {
-    Serial.print(".");
-    GpsData previousGpsData = getPreviousEntry();
-    GpsData gpsData = parseFix(gps.read());
+    previousGps = currentGps;
+    previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
 
-    currentGPSCharacteristic->setValue((uint8_t*)&gpsData, sizeof(GpsData));
+    currentGps = parseFix(gps.read());
+    currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
+
+    // update possibly connected ble device
+    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
     currentGPSCharacteristic->notify();
     delay(3);
 
-    NeoGPS::Location_t previousGpsData_location( previousGpsData.lat, previousGpsData.lng);
-    NeoGPS::Location_t gpsData_location( gpsData.lat, gpsData.lng);
-    float travelled = gpsData_location.DistanceKm( previousGpsData_location ) * 1000;
-    float bearing = gpsData_location.BearingTo( previousGpsData_location );
-    float travelled_lat = cos(bearing) * travelled;
-    float travelled_lng = sin(bearing) * travelled;
-    
-    if (gpsData.status < 3) continue;
+    if (currentGps.status < 3 || previousGps.status < 3) continue;
+    // we got a new location to deal with
 
-    skippedUpdates++;
-    if (skippedUpdates == 60) sendUBX( ubxSpeed4000ms, sizeof(ubxSpeed4000ms) );
-    if (skippedUpdates == 200) sendUBX( ubxSpeed10000ms, sizeof(ubxSpeed10000ms) );
-    
-    if (pointInEllipse(travelled_lat, travelled_lng, gpsData.err_lat * 2, gpsData.err_lng * 2)) continue;
+    // decrease update speed if stationary for a while
+    stationaryUpdates++;
+    if (stationaryUpdates == 60) setUBXSpeed( 4000 );
+    if (stationaryUpdates == 200) {
+      setUBXSpeed( 10000 );
+      #ifdef TBEAM
+      sendTTN(currentGps);
+      #endif
+      // save to flash
+      storeGpsEntry(&previousGps);
 
-    if (skippedUpdates > 2) sendUBX( ubxSpeed2000ms, sizeof(ubxSpeed2000ms) );
-    skippedUpdates = 0;
+      lastStoredGps = previousGps;
+      lastStoredLocation = previousLocation;
+      Serial.println("Wrote location to history");
+      continue;
+    }
 
-    storeGpsEntry(&gpsData);
+    if (isStationary(previousLocation, currentLocation, currentGps.err_lat, currentGps.err_lng)) {
+      continue;
+    }
+    // not stationary anymore
 
-    Serial.println("Wrote location to history");
+    // increase update speed again
+    if (stationaryUpdates > 2) setUBXSpeed( 2000 );
+    // reset counter
+    stationaryUpdates = 0;
+
+    float newDeviation = calcDeviation(lastStoredLocation, previousLocation, currentLocation);
+    Serial.print("Adding deviation");
+    Serial.println(newDeviation);
+    lineDeviation += newDeviation;
+    Serial.print("current deviation");
+    Serial.println(lineDeviation);
+    if (!lastStoredGps.status || currentGps.time - lastStoredGps.time > 60 || abs(newDeviation) > 0.5 || abs(lineDeviation) > 2.0) {
+      // save to flash
+      storeGpsEntry(&previousGps);
+
+      lastStoredGps = previousGps;
+      lastStoredLocation = previousLocation;
+
+      lineDeviation = newDeviation;
+
+      Serial.println("Wrote location to history");
+    } else {
+      Serial.println("Skipping location");
+    }
   }
 }
