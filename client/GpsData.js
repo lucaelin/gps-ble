@@ -21,14 +21,22 @@ export const GpsData = {
 };
 
 export const GpsStatus = {
-  STATUS_NONE: 0,
-  STATUS_EST: 1,
-  STATUS_TIME_ONLY: 2,
-  STATUS_STD: 3,
-  STATUS_DGPS: 4,
-  STATUS_RTK_FLOAT: 5,
-  STATUS_RTK_FIXED: 6,
-  STATUS_PPS: 7,
+  NOT_VALID: 0,
+  STATIONARY: 1,
+  MOVING_STRAIGHT: 2,
+  SIGNIFICANT: 3,
+  /*NONE: 0,
+  EST: 1,
+  TIME_ONLY: 2,
+  STD: 3,
+  DGPS: 4,
+  RTK_FLOAT: 5,
+  RTK_FIXED: 6,
+  PPS: 7,*/
+}
+
+for (const [k, v] of Object.entries(GpsStatus)) {
+  GpsStatus[k+'+'] = v+8;
 }
 
 export const GpsStatusLookup = Object.fromEntries(

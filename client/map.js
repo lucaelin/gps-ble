@@ -10,6 +10,7 @@ export const dom = {
   lat: document.querySelector('.lat'),
   lng: document.querySelector('.lng'),
   alt: document.querySelector('.alt'),
+  dev: document.querySelector('.dev'),
   err: document.querySelector('.err'),
 }
 
@@ -55,7 +56,7 @@ function createPath() {
 
 export function plotPosition(gpsData, realtime=false) {
   const date = Y2KtoDate(gpsData.time);
-  const hasFix = gpsData.status >= GpsStatus.STATUS_STD;
+  const hasFix = gpsData.status != GpsStatus.NOT_VALID;
 
   if (realtime) {
     setUi('date', date.toLocaleDateString(), gpsData.time);

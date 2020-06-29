@@ -55,7 +55,7 @@ async function runTest() {
   const data = new ArrayOfStructuredDataViews(b, GpsData);
 
   const data2 = data
-    .filter(l=>l.status >= GpsStatus.STATUS_STD)
+    .filter(l=>l.status != GpsStatus.NOT_VALID)
     .sort((a,b)=>a.time-b.time);
   console.log(data2);
 

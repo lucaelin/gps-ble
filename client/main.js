@@ -84,7 +84,7 @@ async function downloadHistory(chistory) {
     const chunk = new ArrayOfStructuredDataViews(historyBuffer.buffer, GpsData);
 
     plotPath(chunk
-      .filter(l=>l.status >= GpsStatus.STATUS_STD)
+      .filter(l=>l.status != GpsStatus.NOT_VALID)
       .sort((a,b)=>a.time-b.time)
     );
     count += chunk.length;

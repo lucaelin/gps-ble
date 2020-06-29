@@ -20,6 +20,8 @@ __attribute__((packed)) struct GpsData {
   float alt;
 };
 
+enum Situation { NOT_VALID, STATIONARY, MOVING_STRAIGHT, SIGNIFICANT };
+
 __attribute__((packed)) struct StatusData {
   uint32_t flash_total;
   uint32_t flash_free;

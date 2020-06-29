@@ -1,4 +1,3 @@
-
 #include <NMEAGPS.h>
 #include "FS.h"
 #include "FFat.h"
@@ -39,8 +38,9 @@ char ubxSpeed[] =
 { 0x06, 0x08, 0x06, 0x00, 0xd0, 0x07, 0x01, 0x00, 0x01, 0x00 };
 
 void setUBXSpeed(uint16_t ms) {
-  ubxSpeed[4] = ((uint8_t*)&ms)[0];
-  ubxSpeed[5] = ((uint8_t*)&ms)[1];
+  uint8_t* v = (uint8_t*)&ms;
+  ubxSpeed[4] = v[0];
+  ubxSpeed[5] = v[1];
   sendUBX(ubxSpeed, 10);
   Serial.print("Setting ubx speed to ");
   Serial.println((int) ms);
@@ -173,22 +173,7 @@ void setup() {
   Serial.println("3 - Profit!");
 }
 
-void loop() {
-  while (gps.available( Serial1 )) {
-    previousGps = currentGps;
-    previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
-
-    currentGps = parseFix(gps.read());
-    currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
-
-    // update possibly connected ble device
-    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
-    currentGPSCharacteristic->notify();
-    delay(3);
-
-    if (currentGps.status < 3 || previousGps.status < 3) continue;
-    // we got a new location to deal with
-
+Situation processGps() {
     // decrease update speed if stationary for a while
     stationaryUpdates++;
     if (stationaryUpdates == 60) setUBXSpeed( 4000 );
@@ -197,17 +182,12 @@ void loop() {
       #ifdef TBEAM
       sendTTN(currentGps);
       #endif
-      // save to flash
-      storeGpsEntry(&previousGps);
 
-      lastStoredGps = previousGps;
-      lastStoredLocation = previousLocation;
-      Serial.println("Wrote location to history");
-      continue;
+      return SIGNIFICANT;
     }
 
-    if (isStationary(previousLocation, currentLocation, currentGps.err_lat, currentGps.err_lng)) {
-      continue;
+    if (lastStoredGps.status != NOT_VALID && isStationary(lastStoredLocation, currentLocation, currentGps.err_lat, currentGps.err_lng)) {
+      return STATIONARY;
     }
     // not stationary anymore
 
@@ -217,23 +197,45 @@ void loop() {
     stationaryUpdates = 0;
 
     float newDeviation = calcDeviation(lastStoredLocation, previousLocation, currentLocation);
-    Serial.print("Adding deviation");
-    Serial.println(newDeviation);
     lineDeviation += newDeviation;
-    Serial.print("current deviation");
-    Serial.println(lineDeviation);
+
     if (!lastStoredGps.status || currentGps.time - lastStoredGps.time > 60 || abs(newDeviation) > 0.5 || abs(lineDeviation) > 2.0) {
+      lineDeviation = newDeviation;
+      return SIGNIFICANT;
+    } else {
+      return MOVING_STRAIGHT;
+    }
+}
+
+void loop() {
+  while (gps.available( Serial1 )) {
+    previousGps = currentGps;
+    previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
+
+    currentGps = parseFix(gps.read());
+    currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
+
+    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) continue;
+
+    Situation s = processGps();
+
+    currentGps.status = s;
+
+    if (s == SIGNIFICANT) {
       // save to flash
       storeGpsEntry(&previousGps);
 
       lastStoredGps = previousGps;
       lastStoredLocation = previousLocation;
-
-      lineDeviation = newDeviation;
-
       Serial.println("Wrote location to history");
     } else {
-      Serial.println("Skipping location");
+      Serial.print(s);
+      Serial.println(", skipping location.");
     }
+    // update possibly connected ble device
+    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
+    currentGPSCharacteristic->notify();
+    delay(3);
+
   }
 }
