@@ -60,6 +60,7 @@ void sendUBX( char *bytes, size_t len )
     uint8_t c = bytes[i];
     a += c;
     b += a;
+    Serial1.write( c ); // C
     i++;
   }
 
