@@ -1,9 +1,24 @@
+import {GpsData} from '../GpsData.js';
+
 function getLocation(point) {
-  return [point.location.lat, point.location.lng];
+  const lat = point.lat || point.location.lat;
+  const lng = point.lng || point.location.lng;
+
+  return [lat, lng];
 }
 function getError(point) {
-  return [point.error.lat, point.error.lng];
+  const lat = point.errorLat || point.error_lat || point.errLat || point.error.lat;
+  const lng = point.errorLng || point.error_lng || point.errLng || point.error.lng;
+
+  return [lat, lng];
 }
+
+const supportedTypes = {
+  'application/json': async (file) => JSON.parse(await file.text()),
+  'application/octet-stream': async (file) => {
+    return [...new structuredDataView.ArrayOfStructuredDataViews(await file.arrayBuffer(), GpsData)];
+  },
+};
 
 const dom = {
   fileselect: document.querySelector('input[type=file][name="select"]'),
@@ -20,16 +35,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 dom.fileselect.addEventListener('change', async ()=>{
-  const hopefullyFiles = [...dom.fileselect.files].map(async file=>{
-    const text = await new Promise((res=>{
-      const reader = new FileReader();
-      reader.addEventListener('load', (event) => {
-        res(event.target.result);
-      });
-      reader.readAsText(file);
-    }));
-
-    return JSON.parse(text)
+  const hopefullyFiles = [...dom.fileselect.files].map(f=>{
+    const handle = supportedTypes[f.type];
+    if (!handle) {
+      alert('unsupported file type '+f.type);
+      window.location.reload();
+    }
+    return handle(f);
   });
 
   const data = (await Promise.all(hopefullyFiles)).flat();
@@ -54,7 +66,7 @@ function render(data) {
   });
 
   path.setLatLngs(
-    data.map(({location: {lat, lng}})=>[lat, lng])
+    data.map((point)=>getLocation(point))
   );
 }
 
