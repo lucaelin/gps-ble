@@ -1,4 +1,3 @@
-import 'https://unpkg.com/leaflet-ant-path@1.3.0/dist/leaflet-ant-path.js';
 import 'https://unpkg.com/@surma/structured-data-view@0.0.2/dist/structured-data-view.umd.js';
 const {StructuredDataView, ArrayOfStructuredDataViews} = structuredDataView;
 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>GPS-BLE</title>
+        <title>GPS-Render</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta http-equiv="Content-Security-Policy" content="
@@ -23,29 +23,20 @@
           crossorigin=""></script>
         <script src="https://unpkg.com/leaflet-ellipse@0.9.1/l.ellipse.js" crossorigin=""></script>
         <script src="https://unpkg.com/leaflet-ant-path@1.3.0/dist/leaflet-ant-path.js" crossorigin=""></script>
+        <script src="https://unpkg.com/leaflet-mouse-position@1.2.0/src/L.Control.MousePosition.js" crossorigin=""></script>
         <script type="module" src="main.js" ></script>
         <script type="module" src="wakelock.js" ></script>
     </head>
     <body>
-      <h1>GPS-BLE</h1>
-      <div id="dev" class="card h">
+      <h1>GPS-Render</h1>
+      <div id="file" class="card h">
         <div class="v">
-          <div>device: <span class="connect"><button name="connect">connect</button></span></div>
-          <div>status: <span class="status">not connected</span></div>
+          <div>file: <span class="select"><input type="file" name="select" accept=".json"/></span></div>
+          <div>status: <span class="status">no file</span></div>
         </div>
       </div>
-      <div id="gps" class="card h">
-        <div class="v">
-          <div>date: <span class="date">-</span></div>
-          <div>time: <span class="time">-</span></div>
-          <div>sats: <span class="sats">-</span></div>
-        </div>
-        <div class="v">
-          <div>lat: <span class="lat">-</span></div>
-          <div>lng: <span class="lng">-</span></div>
-          <div>alt: <span class="alt">-</span></div>
-          <div>err 1σ: <span class="err">-</span></div>
-        </div>
+      <div id="point" class="card h">
+        <pre></pre>
       </div>
       <div id="mymap"></div>
     </body>

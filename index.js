@@ -14,7 +14,7 @@ const ttnBackend = {
 }
 
 app.get('/data', async (req, res)=>{
-  const data = await fetch(ttnBackend.url, {headers: ttnBackend.headers}).then(res=>res.json());
+  const data = await fetch(ttnBackend.url, {headers: ttnBackend.headers}).then(res=>res.status===204?[]:res.json());
   res.send(data);
 });
 

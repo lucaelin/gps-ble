@@ -1,0 +1,90 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  background-color: #222223;
+  color: white;
+  font-family: 'ubuntu', sans-serif;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-gap: 1rem;
+  grid-template:
+    "h1" auto
+    "file" auto
+    "point" 20vh
+    "map" 1fr /
+    1fr   ;
+}
+
+@media (min-width: 800px) {
+  body {
+    grid-template:
+      "h1   h1"   auto
+      "file  point"  20vh
+      "map  map"  1fr /
+      1fr   1fr   ;
+  }
+}
+
+@media (max-height: 400px) and (min-width: 800px) {
+  body {
+    grid-template:
+      "h1   map"  auto
+      "file  map"  auto
+      "point  map"  auto
+      ".    map"  1fr /
+      1fr   1fr   ;
+  }
+}
+
+h1 {
+  margin: 0.26rem;
+  text-align: center;
+  grid-area: h1;
+}
+
+.card {
+  margin: 0rem 1rem;
+  padding: 0.5rem;
+  display: grid;
+  background-color: #EEF3;
+  box-shadow: 3px 3px 6px black;
+  font-family: 'ubuntu mono', monospace;
+  white-space: pre;
+}
+
+.h {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  min-width: 0;
+}
+.v {
+  display: grid;
+  grid-auto-rows: 1fr;
+  grid-auto-flow: row;
+  min-width: 0;
+}
+
+#file {
+  grid-area: file;
+}
+
+#point {
+  grid-area: point;
+}
+
+#point pre {
+  overflow: auto;
+}
+
+#mymap {
+  grid-area: map;
+}
