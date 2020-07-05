@@ -1,23 +1,23 @@
-const {StructuredDataView} = structuredDataView;
+import {BufferBackedObject, } from 'https://unpkg.com/buffer-backed-object@0.2.2/dist/buffer-backed-object.modern.js';
 
 export const StatusData = {
-  flash_total:    StructuredDataView.Uint32({endianess: 'little'}),
-  flash_free:     StructuredDataView.Uint32({endianess: 'little'}),
-  history_length: StructuredDataView.Uint32({endianess: 'little'}),
-  logFile:        StructuredDataView.UTF8String(12),
-  logFileSize:    StructuredDataView.Uint32({endianess: 'little'}),
+  flash_total:    BufferBackedObject.Uint32({endianess: 'little'}),
+  flash_free:     BufferBackedObject.Uint32({endianess: 'little'}),
+  history_length: BufferBackedObject.Uint32({endianess: 'little'}),
+  logFile:        BufferBackedObject.UTF8String(12),
+  logFileSize:    BufferBackedObject.Uint32({endianess: 'little'}),
 }
 console.log(StatusData);
 
 export const GpsData = {
-  time:   StructuredDataView.Uint32({endianess: 'little'}),
-  status: StructuredDataView.Uint8({endianess: 'little'}),
-  sats:   StructuredDataView.Uint8({endianess: 'little'}),
-  errLat: StructuredDataView.Uint8({endianess: 'little'}),
-  errLng: StructuredDataView.Uint8({endianess: 'little'}),
-  lat:    StructuredDataView.Float32({endianess: 'little'}),
-  lng:    StructuredDataView.Float32({endianess: 'little'}),
-  alt:    StructuredDataView.Float32({endianess: 'little'}),
+  time:   BufferBackedObject.Uint32({endianess: 'little'}),
+  status: BufferBackedObject.Uint8({endianess: 'little'}),
+  sats:   BufferBackedObject.Uint8({endianess: 'little'}),
+  errLat: BufferBackedObject.Uint8({endianess: 'little'}),
+  errLng: BufferBackedObject.Uint8({endianess: 'little'}),
+  lat:    BufferBackedObject.Float32({endianess: 'little'}),
+  lng:    BufferBackedObject.Float32({endianess: 'little'}),
+  alt:    BufferBackedObject.Float32({endianess: 'little'}),
 };
 
 export const GpsStatus = {
@@ -25,14 +25,10 @@ export const GpsStatus = {
   STATIONARY: 1,
   MOVING_STRAIGHT: 2,
   SIGNIFICANT: 3,
-  /*NONE: 0,
-  EST: 1,
-  TIME_ONLY: 2,
-  STD: 3,
-  DGPS: 4,
-  RTK_FLOAT: 5,
-  RTK_FIXED: 6,
-  PPS: 7,*/
+  STAY: 4,
+  GEOFENCE_LEAVE: 5,
+  GEOFENCE_ENTER: 6,
+  GEOFENCE_STAY: 7,
 }
 
 for (const [k, v] of Object.entries(GpsStatus)) {

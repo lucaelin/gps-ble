@@ -1,5 +1,11 @@
+import 'https://unpkg.com/@surma/structured-data-view@0.0.2/dist/structured-data-view.umd.js';
+const {ArrayOfStructuredDataViews} = structuredDataView;
+
 import {GpsData} from '../GpsData.js';
 
+function getTrack(point) {
+  return point.id || point.name || point.date || Math.floor(point.time / (60*60*24)) || 0;
+}
 function getLocation(point) {
   const lat = point.lat || point.location.lat;
   const lng = point.lng || point.location.lng;
@@ -16,9 +22,18 @@ function getError(point) {
 const supportedTypes = {
   'application/json': async (file) => JSON.parse(await file.text()),
   'application/octet-stream': async (file) => {
-    return [...new structuredDataView.ArrayOfStructuredDataViews(await file.arrayBuffer(), GpsData)];
+    return [...new ArrayOfStructuredDataViews(await file.arrayBuffer(), GpsData)];
   },
 };
+
+const colors = [
+  "#FF0000",
+  "#00FFFF",
+  "#FF8800",
+  "#0000FF",
+  "#00FF00",
+  "#FF00FF",
+];
 
 const dom = {
   fileselect: document.querySelector('input[type=file][name="select"]'),
@@ -27,7 +42,10 @@ const dom = {
   point: document.querySelector('#point pre'),
 }
 
-const map = L.map('mymap').setView([53.140, 8.23], 10);
+const map = L.map('mymap', {
+    minZoom: 7,
+    maxZoom: 18,
+}).setView([53.140, 8.23], 10);
 console.log("map", map);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -46,22 +64,32 @@ dom.fileselect.addEventListener('change', async ()=>{
 
   const data = (await Promise.all(hopefullyFiles)).flat();
 
-  dom.status.textContent = `loaded ${data.length} locations`
+  const grouped = {};
+  for (const e of data) {
+    const t = getTrack(e);
+    if (!grouped[t]) grouped[t] = [];
+    grouped[t].push(e);
+  }
+  const tracks = Object.values(grouped);
+  console.log(data, grouped, tracks);
 
-  render(data);
+  dom.status.textContent = `loaded ${data.length} locations on ${tracks.length} paths`;
+
+  tracks.forEach((t, i)=>render(t, i));
 }, false);
 
 const cursor = L.control.mousePosition().addTo(map);
-function render(data) {
+function render(data, index) {
   const path = L.polyline.antPath([], {
     delay: 2000,
+    color: colors[index % colors.length],
   }).addTo(map);
   path.on('mouseover', ()=>{
     const {lat: cLat, lng: cLng} = cursor.getLatLng();
     const cursorLocation = [cLat, cLng];
 
     const distances = data.map(point=>({distance: distanceKm(getLocation(point), cursorLocation), point: point}));
-    const closest = distances.sort((a,b)=>a.distance - b.distance)[0];
+    const closest = distances.reduce((p,c)=>p.distance<c.distance?p:c);
     renderClosest(closest.point);
   });
 

@@ -8,6 +8,17 @@
 #include "FFat.h"
 #include "file.h"
 
+enum Situation {
+  NOT_VALID,
+  STATIONARY,
+  MOVING_STRAIGHT,
+  SIGNIFICANT,
+  STAY,
+  GEOFENCE_LEAVE,
+  GEOFENCE_ENTER,
+  GEOFENCE_STAY,
+};
+
 // max 20 byte to fit into BLE notify payload
 __attribute__((packed)) struct GpsData {
   uint32_t time;
@@ -20,14 +31,20 @@ __attribute__((packed)) struct GpsData {
   float alt;
 };
 
-enum Situation { NOT_VALID, STATIONARY, MOVING_STRAIGHT, SIGNIFICANT };
-
 __attribute__((packed)) struct StatusData {
   uint32_t flash_total;
   uint32_t flash_free;
   uint32_t history_length;
   char logFile[12];
   uint32_t logFileSize;
+};
+
+__attribute__((packed)) struct Geofence {
+  float lat;
+  float lng;
+  float width;
+  float height;
+  float rot;
 };
 
 const uint32_t history_length = 1000;

@@ -32,7 +32,10 @@ const colors = [
   "#FF00FF",
 ]
 
-const mymap = L.map('mymap').setView([53.140, 8.23], 13);
+const mymap = L.map('mymap', {
+    minZoom: 5,
+    maxZoom: 20,
+}).setView([53.140, 8.23], 13);
 console.log("map", mymap);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -105,6 +108,10 @@ export function plotPosition(gpsData, realtime=false) {
     path.data.map(({lat, lng})=>[lat, lng])
   );
 
+  if (gpsData.status >= GpsStatus.STAY) {
+    plotStop(gpsData);
+  }
+
   if (realtime) {
     currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
     currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
@@ -120,5 +127,5 @@ export function plotPath(path) {
 
 export function plotStop(gpsData) {
   const date = Y2KtoDate(gpsData.time);
-  L.marker([gpsData.lat, gpsData.lng], {title: 'stopped at '+date.toLocaleString()}).addTo(mymap);
+  L.marker([gpsData.lat, gpsData.lng], {title: GpsStatusLookup[gpsData.status] + ' at '+date.toLocaleString()}).addTo(mymap);
 }

@@ -1,5 +1,4 @@
-import 'https://unpkg.com/@surma/structured-data-view@0.0.2/dist/structured-data-view.umd.js';
-const {StructuredDataView, ArrayOfStructuredDataViews} = structuredDataView;
+import {BufferBackedObject, ArrayOfBufferBackedObjects} from 'https://unpkg.com/buffer-backed-object@0.2.2/dist/buffer-backed-object.modern.js';
 
 import {plotPath, plotPosition, plotStop, dom} from './map.js';
 import {StatusData, GpsData, GpsStatus, Y2KtoDate} from './GpsData.js';
@@ -80,7 +79,7 @@ async function downloadHistory(chistory) {
     dom.status.textContent = "loading data... ("+count+")";
     const historyBuffer = await chistory.readValue();
     if (!historyBuffer.byteLength) break;
-    const chunk = new ArrayOfStructuredDataViews(historyBuffer.buffer, GpsData);
+    const chunk = new ArrayOfBufferBackedObjects(historyBuffer.buffer, GpsData);
 
     plotPath(chunk
       .filter(l=>l.status != GpsStatus.NOT_VALID)
@@ -93,9 +92,10 @@ async function downloadHistory(chistory) {
 
 async function startContinuousUpdates(ccurrent) {
   const update = (v)=>{
-    const gpsData = new StructuredDataView(v.buffer, GpsData);
+    const gpsData = new BufferBackedObject(v.buffer, GpsData);
     plotPosition(gpsData, true);
   }
+
   ccurrent.addEventListener('characteristicvaluechanged', (e)=>update(e.target.value));
   await ccurrent.startNotifications().catch(async e=>{
     console.log('fallback to interval based polling');
@@ -108,8 +108,7 @@ async function startContinuousUpdates(ccurrent) {
 
 async function getStatus(cstatus) {
   const {buffer} = await cstatus.readValue();
-  console.log(buffer);
-  const statusData = new StructuredDataView(buffer, StatusData);
+  const statusData = new BufferBackedObject(buffer, StatusData);
   console.log(JSON.stringify(statusData, null, 4));
 }
 
@@ -122,7 +121,7 @@ async function downloadTTNData() {
   if(!data.length) return;
 
   const buffers = data.map(({raw})=>Uint8Array.from(atob(raw), c => c.charCodeAt(0)).buffer);
-  const locations = buffers.map(b=>new StructuredDataView(b, GpsData)).filter(l=>l.status);
+  const locations = buffers.flatMap(b=>new ArrayOfBufferBackedObjects(b, GpsData));
 
-  locations.forEach(l=>plotStop(l));
+  plotPath(locations);
 }

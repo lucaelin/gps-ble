@@ -11,15 +11,15 @@ BLECharacteristic *statusCharacteristic;
 uint32_t history_position;
 
 class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-      Serial.println("BLE connected");
-      history_position = floor( getLatestFile().size() / sizeof(GpsData) ) * sizeof(GpsData);
-    };
+  void onConnect(BLEServer* pServer) {
+    Serial.println("BLE connected");
+    history_position = floor( getLatestFile().size() / sizeof(GpsData) ) * sizeof(GpsData);
+  };
 
-    void onDisconnect(BLEServer* pServer) {
-      Serial.println("BLE disconnected");
-      BLEDevice::startAdvertising();
-    }
+  void onDisconnect(BLEServer* pServer) {
+    Serial.println("BLE disconnected");
+    BLEDevice::startAdvertising();
+  }
 };
 
 class GpsCallbacks: public BLECharacteristicCallbacks {

@@ -1,21 +1,14 @@
-#include <NMEAGPS.h>
 #include "FS.h"
 #include "FFat.h"
-
-#include "data.h"
-#include "file.h"
-#include "ble.h"
+#include <NMEAGPS.h>
 
 #define TBEAM
 
-#ifdef TBEAM
-static const int RXPin = 34, TXPin = 12;
-#else
-static const int RXPin = 14, TXPin = 12;
-#endif
-static const uint32_t GPSBaud = 9600;
-
-NMEAGPS gps;
+#include "data.h"
+#include "file.h"
+#include "gps.h"
+//#include "ble.h"
+#include "wifi.h"
 
 GpsData lastStoredGps;
 NeoGPS::Location_t lastStoredLocation;
@@ -24,6 +17,9 @@ NeoGPS::Location_t previousLocation;
 GpsData currentGps;
 NeoGPS::Location_t currentLocation;
 
+uint32_t stationaryUpdates = 0;
+float lineDeviation = 0;
+
 #ifdef TBEAM
 #include "axp20x.h"
 AXP20X_Class axp;
@@ -31,50 +27,10 @@ AXP20X_Class axp;
 #define I2C_SCL         22
 #endif
 
-// https://www.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_(GPS.G6-SW-10018)_Public.pdf?utm_source=en/images/downloads/Product_Docs/u-blox6_ReceiverDescriptionProtocolSpec_(GPS.G6-SW-10018).pdf
-// page 138
-// or https://github.com/SlashDevin/NeoGPS/blob/master/examples/ubloxRate/ubloxRate.ino#L130
-char ubxSpeed[] =
-{ 0x06, 0x08, 0x06, 0x00, 0xd0, 0x07, 0x01, 0x00, 0x01, 0x00 };
-
-void setUBXSpeed(uint16_t ms) {
-  uint8_t* v = (uint8_t*)&ms;
-  ubxSpeed[4] = v[0];
-  ubxSpeed[5] = v[1];
-  sendUBX(ubxSpeed, 10);
-  Serial.print("Setting ubx speed to ");
-  Serial.println((int) ms);
-}
-
-uint32_t stationaryUpdates = 0;
-float lineDeviation = 0;
-
-void sendUBX( char *bytes, size_t len )
-{
-  Serial1.write( 0xB5 ); // SYNC1
-  Serial1.write( 0x62 ); // SYNC2
-
-  uint8_t a = 0, b = 0;
-  uint8_t i = 0;
-  while (i < len) {
-    uint8_t c = bytes[i];
-    a += c;
-    b += a;
-    Serial1.write( c ); // C
-    i++;
-  }
-
-  Serial1.write( a ); // CHECKSUM A
-  Serial1.write( b ); // CHECKSUM B
-
-  delay(10);
-
-} // sendUBX
-
-bool isStationary(NeoGPS::Location_t a, NeoGPS::Location_t b, uint8_t err_lat, uint8_t err_lng) {
+bool isInsideGeofence(NeoGPS::Location_t a, NeoGPS::Location_t b, uint8_t err_lat, uint8_t err_lng, float rot) {
   // calculate distances
   float travelled = a.DistanceKm( b ) * 1000;
-  float bearing = a.BearingTo( b );
+  float bearing = a.BearingTo( b ) - rot;
   float travelled_lat = cos(bearing) * travelled;
   float travelled_lng = sin(bearing) * travelled;
 
@@ -130,31 +86,15 @@ void setup() {
   Serial.printf("Exten: %s\n", axp.isExtenEnable() ? "ENABLE" : "DISABLE");
 
   delay(1000);
+
+  Serial.println("TTN setup");
   setupTTN();
+  delay(100);
 #endif
 
-
-  Serial1.begin(GPSBaud, (uint32_t) SERIAL_8N1, RXPin, TXPin);
-
-  // include location error data (GST sentences)
-  delay(1000);
-  gps.send_P( &Serial1, F("PUBX,40,GST,0,1,0,0,0,0") );
+  Serial.println("GPS setup");
+  setupGPS();
   delay(100);
-  /*
-    Serial1.println(F("$PUBX,40,VTG,0,0,0,0*5E")); //VTG OFF
-    delay(100);
-    Serial1.println(F("$PUBX,40,GGA,0,0,0,0*5A")); //GGA OFF
-    delay(100);
-    Serial1.println(F("$PUBX,40,GSA,0,0,0,0*4E")); //GSA OFF
-    delay(100);
-    Serial1.println(F("$PUBX,40,GSV,0,0,0,0*59")); //GSV OFF
-    delay(100);
-    Serial1.println(F("$PUBX,40,GLL,0,0,0,0*5C")); //GLL OFF
-    delay(100);
-  */
-  setUBXSpeed(2000);
-
-  delay(1000);
 
   //FFat.format();
   Serial.setDebugOutput(true);
@@ -163,10 +103,16 @@ void setup() {
     return;
   }
 
+  Serial.println("HISTORY setup");
   loadGpsHistory();
-
   delay(100);
-  setupBLE();
+
+  //Serial.println("BLE setup");
+  //setupBLE();
+  //delay(100);
+
+  Serial.println("WIFI setup");
+  setupWIFI();
   delay(100);
 
   Serial.println("1 - Go to https://lucaelin.github.io/gps-ble");
@@ -175,19 +121,31 @@ void setup() {
 }
 
 Situation processGps() {
-    // decrease update speed if stationary for a while
-    stationaryUpdates++;
-    if (stationaryUpdates == 60) setUBXSpeed( 4000 );
-    if (stationaryUpdates == 200) {
-      setUBXSpeed( 10000 );
-      #ifdef TBEAM
-      sendTTN(currentGps);
-      #endif
-
+    if (lastStoredGps.status == NOT_VALID) {
       return SIGNIFICANT;
     }
 
-    if (lastStoredGps.status != NOT_VALID && isStationary(lastStoredLocation, currentLocation, currentGps.err_lat, currentGps.err_lng)) {
+    Geofence fence = {
+      .lat = 53.14021301269531,
+      .lng = 8.180638313293457,
+      .width = 30.0,
+      .height = 30.0,
+      .rot = 0.0,
+    };
+
+    NeoGPS::Location_t fenceLocation( fence.lat, fence.lng );
+    boolean currentlyInside = isInsideGeofence(currentLocation, fenceLocation, fence.height, fence.width, fence.rot);
+    boolean previouslyInside = isInsideGeofence(previousLocation, fenceLocation, fence.height, fence.width, fence.rot);
+
+    // decrease update speed if stationary for a while
+    stationaryUpdates++;
+    if (stationaryUpdates == 60) setUBXSpeed( 4000 );
+    if (stationaryUpdates == 100) {
+      setUBXSpeed( 10000 );
+      return currentlyInside?GEOFENCE_STAY:STAY;
+    }
+
+    if (isInsideGeofence(currentLocation, lastStoredLocation, currentGps.err_lat, currentGps.err_lng, 0.0)) {
       return STATIONARY;
     }
     // not stationary anymore
@@ -196,6 +154,10 @@ Situation processGps() {
     if (stationaryUpdates > 2) setUBXSpeed( 2000 );
     // reset counter
     stationaryUpdates = 0;
+
+    if (currentlyInside != previouslyInside) {
+      return currentlyInside?GEOFENCE_ENTER:GEOFENCE_LEAVE;
+    }
 
     float newDeviation = calcDeviation(lastStoredLocation, previousLocation, currentLocation);
     lineDeviation += newDeviation;
@@ -222,21 +184,31 @@ void loop() {
 
     currentGps.status = s;
 
-    if (s == SIGNIFICANT) {
+    Serial.print("GPS status: ");
+    Serial.println(s);
+
+    if (s >= SIGNIFICANT) {
       // save to flash
       storeGpsEntry(&previousGps);
 
       lastStoredGps = previousGps;
       lastStoredLocation = previousLocation;
       Serial.println("Wrote location to history");
+
+#ifdef TBEAM
+      if (s >= STAY) {
+        sendTTN(currentGps);
+        Serial.println("Sent location to ttn");
+        uploadWIFI();
+        Serial.println("Sent location to wifi");
+      }
+#endif
     } else {
-      Serial.print(s);
-      Serial.println(", skipping location.");
+      Serial.println("Skipping location.");
     }
     // update possibly connected ble device
-    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
-    currentGPSCharacteristic->notify();
-    delay(3);
-
+    //currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
+    //currentGPSCharacteristic->notify();
+    //delay(3);
   }
 }
