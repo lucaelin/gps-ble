@@ -140,7 +140,7 @@ Situation processGps() {
     // decrease update speed if stationary for a while
     stationaryUpdates++;
     if (stationaryUpdates == 60) setUBXSpeed( 4000 );
-    if (stationaryUpdates == 100) {
+    if (stationaryUpdates == 200) {
       setUBXSpeed( 10000 );
       return currentlyInside?GEOFENCE_STAY:STAY;
     }
