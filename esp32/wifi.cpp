@@ -10,15 +10,14 @@ WiFiClient client;
 boolean didUpload = false;
 
 void setupWIFI() {
-  WiFi.mode(WIFI_OFF);
   wifiMulti.addAP(ap1, pw1);
   wifiMulti.addAP(ap2, pw2);
+  wifiMulti.addAP(ap3, pw3);
 }
 
 void uploadWIFI() {
   Serial.println("Connecting wifi...");
-  WiFi.mode(WIFI_STA);
-  delay(1000);
+  
   uint32_t count = 0;
   while (count < 100 && wifiMulti.run() != WL_CONNECTED) {
     delay(100);
@@ -39,11 +38,16 @@ void uploadWIFI() {
     client.connect(server, port);
 
     // TODO dynamic device id
-    client.println("POST /upload?device_id=tbeam1 HTTP/1.0");
+    client.println("POST /upload?device_id=tbeam1 HTTP/1.1");
+    client.print("Host: "); client.print(server); client.print(":"); client.println(String(port));
     client.println("Content-Type: application/octet-stream");
     client.print("Content-Length: "); client.println((int) history.size());
     
     client.println();
+    
+    while(client.available()) {
+      client.read();
+    }
 
     history.seek(0);
     while(history.available()) {
@@ -51,18 +55,30 @@ void uploadWIFI() {
     }
     history.close();
     client.flush();
-    delay(1000);
+
+    Serial.println("Awaiting response...");
     
-    while(client.available()) {
-      Serial.write(client.read());
+    uint32_t count = 0;
+    while(count < 100 && client.available()<=16) {
+      delay(100);
+      count++;
     }
-    
-    client.stop();
+
+    char* response = "HTTP/1.1 200 OK\r\n";
+    for(uint8_t i = 0; i<=16; i++) {
+      char c = (char) client.read();
+      Serial.print(c);
+      if (response[i] != c) {
+        while (client.available()) Serial.write(client.read());
+        Serial.println("\nUnexpected HTTP response!");
+        return;
+      }
+    }
+    while (client.available()) Serial.write(client.read());
+    Serial.println("\nUpload success!");
     
     delay(100);
   } else {
     Serial.println("WiFi connection failed!");
   }
-  
-  WiFi.mode(WIFI_OFF);
 }

@@ -3,11 +3,14 @@
 #include <NMEAGPS.h>
 
 #define TBEAM
+//#define BLE
 
 #include "data.h"
 #include "file.h"
 #include "gps.h"
-//#include "ble.h"
+#ifdef BLE
+#include "ble.h"
+#endif
 #include "wifi.h"
 
 GpsData lastStoredGps;
@@ -97,7 +100,6 @@ void setup() {
   delay(100);
 
   //FFat.format();
-  Serial.setDebugOutput(true);
   if (!FFat.begin(true)) {
     Serial.println("FFat Mount Failed");
     return;
@@ -107,15 +109,17 @@ void setup() {
   loadGpsHistory();
   delay(100);
 
-  //Serial.println("BLE setup");
-  //setupBLE();
-  //delay(100);
+#ifdef BLE
+  Serial.println("BLE setup");
+  setupBLE();
+  delay(100);
+#endif
 
   Serial.println("WIFI setup");
   setupWIFI();
   delay(100);
 
-  Serial.println("1 - Go to https://lucaelin.github.io/gps-ble");
+  Serial.println("1 - Go to https://gps-ble.herokuapp.com");
   Serial.println("2 - Connect to neo6m");
   Serial.println("3 - Profit!");
 }
@@ -171,14 +175,17 @@ Situation processGps() {
 }
 
 void loop() {
-  while (gps.available( Serial1 )) {
+  if (gps.available( Serial1 )) {
     previousGps = currentGps;
     previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
 
     currentGps = parseFix(gps.read());
     currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
 
-    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) continue;
+    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) {
+      Serial.println("GPS not valid yet...");
+      return;
+    }
 
     Situation s = processGps();
 
@@ -187,7 +194,7 @@ void loop() {
     Serial.print("GPS status: ");
     Serial.println(s);
 
-    if (s >= SIGNIFICANT) {
+    if (previousGps.status >= SIGNIFICANT) {
       // save to flash
       storeGpsEntry(&previousGps);
 
@@ -206,9 +213,29 @@ void loop() {
     } else {
       Serial.println("Skipping location.");
     }
+
+#ifdef BLE
     // update possibly connected ble device
-    //currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
-    //currentGPSCharacteristic->notify();
-    //delay(3);
+    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
+    currentGPSCharacteristic->notify();
+#endif
+    delay(3);
+  }
+
+  if (Serial.available()) {
+    char i = (char)Serial.read();
+    while (Serial.available()) Serial.read();
+    
+    if (i=='h') {
+      Serial.println("command h: help");
+      Serial.println("command t: sendTTN");
+      Serial.println("command u: uploadWIFI");
+    } else if (i=='t') {
+      Serial.println("command t: sendTTN(currentGps)");
+      sendTTN(currentGps);
+    } else if (i=='u') {
+      Serial.println("command u: uploadWIFI()");
+      uploadWIFI();
+    }
   }
 }
