@@ -49,6 +49,14 @@ void setUBXSpeed(uint16_t ms) {
 void setupGPS() {
   Serial1.begin(GPSBaud, (uint32_t) SERIAL_8N1, RXPin, TXPin);
 
+  while (!Serial1) ;
+
+  Serial.print("Setting up GPS RX ");
+  Serial.print((int) RXPin);
+  Serial.print(", TX ");
+  Serial.print((int) TXPin);
+  Serial.println("");
+
   // include location error data (GST sentences)
   delay(1000);
   gps.send_P( &Serial1, F("PUBX,40,GST,0,1,0,0,0,0") );
@@ -56,8 +64,8 @@ void setupGPS() {
 
   Serial1.println(F("$PUBX,40,VTG,0,0,0,0*5E")); //VTG OFF
   delay(100);
-  Serial1.println(F("$PUBX,40,GGA,0,0,0,0*5A")); //GGA OFF
-  delay(100);
+  //Serial1.println(F("$PUBX,40,GGA,0,0,0,0*5A")); //GGA OFF
+  //delay(100);
   Serial1.println(F("$PUBX,40,GSA,0,0,0,0*4E")); //GSA OFF
   delay(100);
   Serial1.println(F("$PUBX,40,GSV,0,0,0,0*59")); //GSV OFF

@@ -52,13 +52,13 @@ export function distance(gpsData1, gpsData2) {
   const earthRadiusKm = 6371;
 
   const dLat = degreesToRadians(gpsData2.lat-gpsData1.lat);
-  const dLon = degreesToRadians(gpsData2.lon-gpsData1.lon);
+  const dLng = degreesToRadians(gpsData2.lng-gpsData1.lng);
 
   const lat1 = degreesToRadians(gpsData1.lat);
   const lat2 = degreesToRadians(gpsData2.lat);
 
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+          Math.sin(dLng/2) * Math.sin(dLng/2) * Math.cos(lat1) * Math.cos(lat2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return earthRadiusKm * c;
 }

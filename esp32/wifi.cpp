@@ -39,7 +39,8 @@ void uploadWIFI() {
     client.connect(server, port);
 
     // TODO dynamic device id
-    client.println("POST /upload?device_id=tbeam1 HTTP/1.0");
+    client.println("POST /upload?device_id=tbeam1 HTTP/1.1");
+    client.print("Host: "); client.print(server); client.print(":"); client.println(String(port));
     client.println("Content-Type: application/octet-stream");
     client.print("Content-Length: "); client.println((int) history.size());
     

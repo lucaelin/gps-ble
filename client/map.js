@@ -3,6 +3,7 @@ import {GpsStatus, GpsStatusLookup, Y2KtoDate, distance, } from './GpsData.js';
 export const dom = {
   device: document.querySelector('.connect'),
   status: document.querySelector('.status'),
+  focus: document.querySelector('.focus'),
 
   date: document.querySelector('.date'),
   time: document.querySelector('.time'),
@@ -45,6 +46,16 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const currentLocation = L.ellipse([0, 0], [0, 0], 0, {}).addTo(mymap);
 console.log("currentLocation", currentLocation);
 
+dom.focus.addEventListener('click', ()=>{
+  if (currentLocation.getLatLng().lat === 0) return;
+  mymap.setView(currentLocation.getLatLng(), mymap.getZoom());
+});
+
+const hoverLocation = L.ellipse([0, 0], [0, 0], 0, {}).addTo(mymap);
+console.log("hoverLocation", hoverLocation);
+
+const cursor = L.control.mousePosition().addTo(mymap);
+
 const paths = [];
 createPath();
 console.log("paths", paths);
@@ -54,7 +65,19 @@ function createPath() {
     delay: 2000,
     color: colors[paths.length % colors.length],
   }).addTo(mymap);
-  paths.unshift({ants, data: []});
+  const path = {ants, data: []};
+  paths.unshift(path);
+  
+  ants.on('mouseover', ()=>{
+    const cursorLocation = cursor.getLatLng();
+
+    const distances = path.data.map(point=>({distance: distance(point, cursorLocation), point: point}));
+    const closest = distances.reduce((p,c)=>p.distance<c.distance?p:c);
+    
+    hoverLocation.setLatLng([closest.point.lat, closest.point.lng, ]);
+    hoverLocation.setRadius([closest.point.errLat, closest.point.errLng, ]);
+    console.log(closest.point);
+  });
 }
 
 export function plotPosition(gpsData, realtime=false) {
@@ -114,7 +137,7 @@ export function plotPosition(gpsData, realtime=false) {
 
   if (realtime) {
     currentLocation.setLatLng([gpsData.lat, gpsData.lng]);
-    currentLocation.setRadius([gpsData.errLng * 2, gpsData.errLat * 2]);
+    currentLocation.setRadius([gpsData.errLng, gpsData.errLat]);
 
     if (mymap.distance(mymap.getCenter(), [gpsData.lat, gpsData.lng]) < 1400/mymap.getZoom()) {
       mymap.setView([gpsData.lat, gpsData.lng], mymap.getZoom());
@@ -127,5 +150,11 @@ export function plotPath(path) {
 
 export function plotStop(gpsData) {
   const date = Y2KtoDate(gpsData.time);
-  L.marker([gpsData.lat, gpsData.lng], {title: GpsStatusLookup[gpsData.status] + ' at '+date.toLocaleString()}).addTo(mymap);
+  const marker = L.marker([gpsData.lat, gpsData.lng], {title: GpsStatusLookup[gpsData.status] + ' at '+date.toLocaleString()}).addTo(mymap);
+  
+  marker.on('mouseover', ()=>{
+    hoverLocation.setLatLng([gpsData.lat, gpsData.lng, ]);
+    hoverLocation.setRadius([gpsData.errLat, gpsData.errLng, ]);
+    console.log(gpsData);
+  });
 }

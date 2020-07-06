@@ -13,6 +13,6 @@
 
   - [x] delete old files if remaining space gets low
 
-  - [ ] reduce stored location by omitting straight lines
+  - [x] reduce stored location by omitting straight lines
 
-  - [ ] add wifi download (?)
+  - [x] add wifi download (?)

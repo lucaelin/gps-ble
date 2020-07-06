@@ -3,11 +3,14 @@
 #include <NMEAGPS.h>
 
 #define TBEAM
+#define BLE
 
 #include "data.h"
 #include "file.h"
 #include "gps.h"
-//#include "ble.h"
+#ifdef BLE
+#include "ble.h"
+#endif
 #include "wifi.h"
 
 GpsData lastStoredGps;
@@ -106,10 +109,12 @@ void setup() {
   Serial.println("HISTORY setup");
   loadGpsHistory();
   delay(100);
-
-  //Serial.println("BLE setup");
-  //setupBLE();
-  //delay(100);
+  
+#ifdef BLE
+  Serial.println("BLE setup");
+  setupBLE();
+  delay(100);
+#endif
 
   Serial.println("WIFI setup");
   setupWIFI();
@@ -171,14 +176,17 @@ Situation processGps() {
 }
 
 void loop() {
-  while (gps.available( Serial1 )) {
+  if (gps.available( Serial1 )) {
     previousGps = currentGps;
     previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
 
     currentGps = parseFix(gps.read());
     currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
 
-    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) continue;
+    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) {
+      Serial.println("GPS not valid yet...");
+      return;
+    }
 
     Situation s = processGps();
 
@@ -206,9 +214,12 @@ void loop() {
     } else {
       Serial.println("Skipping location.");
     }
+    
+#ifdef BLE
     // update possibly connected ble device
-    //currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
-    //currentGPSCharacteristic->notify();
-    //delay(3);
+    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
+    currentGPSCharacteristic->notify();
+#endif
+    delay(3);
   }
 }
