@@ -60,15 +60,15 @@ void uploadWIFI() {
       count++;
     }
     
-    char response[18];
-    Serial.readBytes(response, 18);
+    char response[17];
+    Serial.readBytes(response, 17);
     Serial.write(response);
     while(client.available()) {
       Serial.write(client.read());
     }
     client.stop();
 
-    if (strncmp(response, "HTTP/1.1 200 OK\r\n", 18) == 0) {
+    if (strncmp(response, "HTTP/1.1 200 OK\r\n", 17) == 0) {
       Serial.println("Upload success!");
     } else {
       Serial.println("Upload failed!");
