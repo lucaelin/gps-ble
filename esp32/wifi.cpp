@@ -13,6 +13,7 @@ void setupWIFI() {
   WiFi.mode(WIFI_OFF);
   wifiMulti.addAP(ap1, pw1);
   wifiMulti.addAP(ap2, pw2);
+  wifiMulti.addAP(ap3, pw3);
 }
 
 void uploadWIFI() {
@@ -52,13 +53,26 @@ void uploadWIFI() {
     }
     history.close();
     client.flush();
-    delay(1000);
+
+    uint32_t count = 0;
+    while(count < 100 && client.available()<18) {
+      delay(100);
+      count++;
+    }
     
+    char response[18];
+    Serial.readBytes(response, 18);
+    Serial.write(response);
     while(client.available()) {
       Serial.write(client.read());
     }
-    
     client.stop();
+
+    if (strncmp(response, "HTTP/1.1 200 OK\r\n", 18) == 0) {
+      Serial.println("Upload success!");
+    } else {
+      Serial.println("Upload failed!");
+    }
     
     delay(100);
   } else {
