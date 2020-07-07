@@ -1,8 +1,5 @@
 #include "data.h"
 
-uint32_t history_index;
-GpsData history_gps[history_length];
-
 bool pointInEllipse(int x, int y, int a, int b) {
   // checking the equation of
   // ellipse with the given point
@@ -43,31 +40,7 @@ GpsData parseFix(gps_fix fix) {
   return gpsData;
 }
 
-void loadGpsHistory() {
-  File gps_log = getLatestFile();
-  if (!gps_log) {
-    Serial.println("There was an error opening the file for reading");
-    return;
-  }
-  uint32_t count = 0;
-  while (gps_log.available()) {
-    GpsData new_gps;
-    if(!gps_log.read((uint8_t*) &new_gps, sizeof(GpsData))) continue;
-
-    history_gps[history_index] = new_gps;
-    history_index = (history_index + 1) % history_length;
-    count++;
-  }
-  gps_log.close();
-  Serial.print("Read ");
-  Serial.print(count);
-  Serial.println(" locations from file");
-}
-
 void storeGpsEntry(GpsData *entry) {
-  history_gps[history_index] = *entry;
-  history_index = (history_index + 1) % history_length;
-
   NeoGPS::time_t time((clock_t) entry->time);
   char str[11];
   sprintf(str, "/%d.BIN", time.days());
@@ -89,11 +62,4 @@ void storeGpsEntry(GpsData *entry) {
     Serial.printf("Free space below threshold, deleting old logs");
     deleteOldestFile();
   }
-}
-
-GpsData getPreviousEntry() {
-  int32_t i = history_index - 1;
-  if (i<0) i += history_length;
-
-  return history_gps[i];
 }

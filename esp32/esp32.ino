@@ -105,10 +105,6 @@ void setup() {
     return;
   }
 
-  Serial.println("HISTORY setup");
-  loadGpsHistory();
-  delay(100);
-
 #ifdef BLE
   Serial.println("BLE setup");
   setupBLE();
@@ -225,12 +221,13 @@ void loop() {
   if (Serial.available()) {
     char i = (char)Serial.read();
     while (Serial.available()) Serial.read();
-    
+
     if (i=='h') {
       Serial.println("command h: help");
-      Serial.println("command t: sendTTN");
-      Serial.println("command u: uploadWIFI");
+      Serial.println("command t: sendTTN(currentGps)");
+      Serial.println("command u: uploadWIFI()");
       Serial.println("command r: ESP.restart()");
+      Serial.println("command f: print flash info");
     } else if (i=='t') {
       Serial.println("command t: sendTTN(currentGps)");
       sendTTN(currentGps);
@@ -240,6 +237,11 @@ void loop() {
     } else if (i=='r') {
       Serial.println("command r: ESP.restart()");
       ESP.restart();
+    } else if (i=='f') {
+      Serial.println("command f: ");
+      Serial.printf("Total space: %10u\n", FFat.totalBytes());
+      Serial.printf("Free space: %10u\n", FFat.freeBytes());
+      listAllFiles();
     }
   }
 }

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+arduino-cli compile -p /dev/ttyUSB00 --fqbn esp32:esp32:esp32 esp32
+arduino-cli upload -p /dev/ttyUSB00 --fqbn esp32:esp32:esp32 esp32

@@ -47,14 +47,8 @@ __attribute__((packed)) struct Geofence {
   float rot;
 };
 
-const uint32_t history_length = 1000;
-extern uint32_t history_index;
-extern GpsData history_gps[history_length];
-
 GpsData parseFix(gps_fix fix);
 bool pointInEllipse(int x, int y, int a, int b);
-void loadGpsHistory();
 void storeGpsEntry(GpsData *entry);
-GpsData getPreviousEntry();
 
 #endif

@@ -13,7 +13,7 @@ uint32_t history_position;
 class MyServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     Serial.println("BLE connected");
-    history_position = floor( getLatestFile().size() / sizeof(GpsData) ) * sizeof(GpsData);
+    history_position = floor( getGPSLogSize() / sizeof(GpsData) ) * sizeof(GpsData);
   };
 
   void onDisconnect(BLEServer* pServer) {
@@ -24,33 +24,33 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
 class GpsCallbacks: public BLECharacteristicCallbacks {
   void onRead (BLECharacteristic *pCharacteristic) {
-    File history = getLatestFile();
+    File history = getGPSLog();
 
     Serial.print("history_position: ");
     Serial.println(history_position);
-    
+
     uint32_t max_chunk_size = floor(CHARACTERISTIC_MTU / sizeof(GpsData)) * sizeof(GpsData);
 
     if (history_position < max_chunk_size) max_chunk_size = history_position;
     history_position -= max_chunk_size;
-    
+
     Serial.print("read starting at: ");
     Serial.println(history_position);
-    
+
     Serial.print("read length: ");
     Serial.println(max_chunk_size);
-    
+
     history.seek(history_position);
 
     if (!max_chunk_size) {
       pCharacteristic->setValue("");
       return;
     }
-    
+
     uint8_t buffer[max_chunk_size];
     history.read(buffer, max_chunk_size);
     history.close();
-    
+
     pCharacteristic->setValue(buffer, max_chunk_size);
   }
 };
@@ -58,23 +58,21 @@ class GpsCallbacks: public BLECharacteristicCallbacks {
 class StatusCallbacks: public BLECharacteristicCallbacks {
   void onRead (BLECharacteristic *pCharacteristic) {
     StatusData sts;
-    
+
     Serial.printf("Total space: %10u\n", FFat.totalBytes());
     Serial.printf("Free space: %10u\n", FFat.freeBytes());
     sts.flash_total = FFat.totalBytes();
     sts.flash_free = FFat.freeBytes();
 
-    sts.history_length = history_length;
-    
-    File latestLogFile = getLatestFile();
+    File gpsLogFile = getGPSLog();
     Serial.print("Latest file: ");
-    Serial.println(latestLogFile.name());
-    strcpy(sts.logFile, latestLogFile.name());
+    Serial.println(gpsLogFile.name());
+    strcpy(sts.logFile, gpsLogFile.name());
 
     Serial.print("Latest file size: ");
-    Serial.println(latestLogFile.size());
-    sts.logFileSize = latestLogFile.size();
-    
+    Serial.println(gpsLogFile.size());
+    sts.logFileSize = gpsLogFile.size();
+
     pCharacteristic->setValue( (uint8_t*)&sts, sizeof(StatusData) );
   }
 };
@@ -85,7 +83,7 @@ void setupBLE() {
   pServer->setCallbacks(new MyServerCallbacks());
 
   pService = pServer->createService(SERVICE_UUID);
-  
+
   historyGPSCharacteristic = pService->createCharacteristic(
                                          CHARACTERISTIC_HIS_UUID,
                                          BLECharacteristic::PROPERTY_READ
@@ -95,19 +93,19 @@ void setupBLE() {
 
   currentGPSCharacteristic = pService->createCharacteristic(
                                          CHARACTERISTIC_GPS_UUID,
-                                         BLECharacteristic::PROPERTY_READ | 
+                                         BLECharacteristic::PROPERTY_READ |
                                          BLECharacteristic::PROPERTY_NOTIFY |
                                          BLECharacteristic::PROPERTY_INDICATE
                                        );
   currentGPSCharacteristic->addDescriptor(new BLE2902());
-  
+
   statusCharacteristic = pService->createCharacteristic(
                                          CHARACTERISTIC_STS_UUID,
                                          BLECharacteristic::PROPERTY_READ
                                        );
   statusCharacteristic->addDescriptor(new BLE2902());
   statusCharacteristic->setCallbacks(new StatusCallbacks());
-  
+
   pService->start();
 
   pAdvertising = pServer->getAdvertising();

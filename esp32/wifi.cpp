@@ -1,5 +1,6 @@
 #include "wifi.h"
 
+#include "file.h"
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <WiFiClient.h>
@@ -17,22 +18,22 @@ void setupWIFI() {
 
 void uploadWIFI() {
   Serial.println("Connecting wifi...");
-  
+
   uint32_t count = 0;
   while (count < 100 && wifiMulti.run() != WL_CONNECTED) {
     delay(100);
     count++;
   }
-  
+
   if(wifiMulti.run() == WL_CONNECTED) {
     Serial.println("WiFi upload");
     //Serial.println("IP address: ");
     //Serial.println(WiFi.localIP());
-    
-    File history = getLatestFile();
+
+    uint32_t gpsLogSize = getGPSLogSize();
 
     Serial.print("history upload with ");
-    Serial.print((int) history.size());
+    Serial.print(gpsLogSize);
     Serial.println(" bytes");
 
     client.connect(server, port);
@@ -41,23 +42,19 @@ void uploadWIFI() {
     client.println("POST /upload?device_id=tbeam1 HTTP/1.1");
     client.print("Host: "); client.print(server); client.print(":"); client.println(String(port));
     client.println("Content-Type: application/octet-stream");
-    client.print("Content-Length: "); client.println((int) history.size());
-    
+    client.print("Content-Length: "); client.println(gpsLogSize);
+
     client.println();
-    
+
     while(client.available()) {
       client.read();
     }
 
-    history.seek(0);
-    while(history.available()) {
-      client.write(history.read());
-    }
-    history.close();
+    readGPSLog(&client);
     client.flush();
 
     Serial.println("Awaiting response...");
-    
+
     uint32_t count = 0;
     while(count < 100 && client.available()<=16) {
       delay(100);
@@ -76,7 +73,10 @@ void uploadWIFI() {
     }
     while (client.available()) Serial.write(client.read());
     Serial.println("\nUpload success!");
-    
+
+    while (deleteOldestFile()) ;
+    Serial.println("\nDeleted old files!");
+
     delay(100);
   } else {
     Serial.println("WiFi connection failed!");
