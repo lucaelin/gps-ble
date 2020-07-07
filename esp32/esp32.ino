@@ -203,8 +203,8 @@ void loop() {
       Serial.println("Wrote location to history");
 
 #ifdef TBEAM
-      if (s >= STAY) {
-        sendTTN(currentGps);
+      if (previousGps.status >= STAY) {
+        sendTTN(previousGps);
         Serial.println("Sent location to ttn");
         uploadWIFI();
         Serial.println("Sent location to wifi");
@@ -230,12 +230,16 @@ void loop() {
       Serial.println("command h: help");
       Serial.println("command t: sendTTN");
       Serial.println("command u: uploadWIFI");
+      Serial.println("command r: ESP.restart()");
     } else if (i=='t') {
       Serial.println("command t: sendTTN(currentGps)");
       sendTTN(currentGps);
     } else if (i=='u') {
       Serial.println("command u: uploadWIFI()");
       uploadWIFI();
+    } else if (i=='r') {
+      Serial.println("command r: ESP.restart()");
+      ESP.restart();
     }
   }
 }
