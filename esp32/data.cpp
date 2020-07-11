@@ -12,7 +12,8 @@ bool pointInEllipse(int x, int y, int a, int b) {
 GpsData parseFix(gps_fix fix) {
   GpsData gpsData;
 
-  gpsData.status = fix.status < 3 ? NOT_VALID : SIGNIFICANT;
+  bool isValid = fix.status >= 3 && fix.valid.satellites && fix.valid.location;
+  gpsData.status = isValid ? SIGNIFICANT : NOT_VALID;
 
   if (fix.valid.date && fix.valid.time)
   {
@@ -30,11 +31,6 @@ GpsData parseFix(gps_fix fix) {
     gpsData.lng = fix.longitude();
     gpsData.err_lat = ceil(fix.lat_err());
     gpsData.err_lng = ceil(fix.lon_err());
-  }
-
-  if (fix.valid.altitude)
-  {
-    gpsData.alt = fix.altitude();
   }
 
   return gpsData;

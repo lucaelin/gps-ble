@@ -40,7 +40,7 @@ const hopefullyDevice = new Promise((res, rej)=>{
 (async function init() {
   try {
     dom.status.textContent = 'loading TTN data...';
-    await downloadTTNData();
+    await downloadData();
     dom.status.textContent = 'Ready to connect';
     //console.log('Waiting for device selection');
     const device = await hopefullyDevice;
@@ -112,16 +112,13 @@ async function getStatus(cstatus) {
   console.log(JSON.stringify(statusData, null, 4));
 }
 
-async function downloadTTNData() {
+async function downloadData() {
   const data = await fetch('./data').then(res=>res.json()).catch(e=>{
     console.warn('did not get data response from backend..', e);
     return [];
   });
 
   if(!data.length) return;
-
-  const buffers = data.map(({raw})=>Uint8Array.from(atob(raw), c => c.charCodeAt(0)).buffer);
-  const locations = buffers.flatMap(b=>new ArrayOfBufferBackedObjects(b, GpsData));
-
-  plotPath(locations);
+  console.log(data);
+  plotPath(data);
 }

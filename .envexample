@@ -1,5 +1,3 @@
-TTN_ACCESS_TOKEN=ttn-account-v2.somethingsomething
-TTN_STORAGE_API=https://myproject.data.thethingsnetwork.org/api/v2/query?last=2d
 MONGODB_ADDRESS=localhost
 MONGODB_USER=gps_user
 MONGODB_PW=asd123

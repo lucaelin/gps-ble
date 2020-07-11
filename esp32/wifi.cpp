@@ -5,6 +5,7 @@
 #include <WiFiMulti.h>
 #include <WiFiClient.h>
 #include "wifi.config.h"
+#include "esp_wifi.h"
 
 WiFiMulti wifiMulti;
 WiFiClient client;
@@ -30,16 +31,15 @@ void uploadWIFI() {
     //Serial.println("IP address: ");
     //Serial.println(WiFi.localIP());
 
+    client.connect(server, port);
+    
     uint32_t gpsLogSize = getGPSLogSize();
-
     Serial.print("history upload with ");
     Serial.print(gpsLogSize);
     Serial.println(" bytes");
 
-    client.connect(server, port);
-
     // TODO dynamic device id
-    client.println("POST /upload?device_id=tbeam1 HTTP/1.1");
+    client.println("POST /upload?source=wifi&dev_id=tbeam1 HTTP/1.1");
     client.print("Host: "); client.print(server); client.print(":"); client.println(String(port));
     client.println("Content-Type: application/octet-stream");
     client.print("Content-Length: "); client.println(gpsLogSize);
@@ -59,6 +59,11 @@ void uploadWIFI() {
     while(count < 100 && client.available()<=16) {
       delay(100);
       count++;
+    }
+
+    if(!client.available()) {
+      Serial.println("No response from server!");
+      return;
     }
 
     char* response = "HTTP/1.1 200 OK\r\n";

@@ -1,46 +1,46 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import mongodb from 'mongodb';
-import fetch from 'node-fetch';
-import dotenv from 'dotenv';
-dotenv.config();
+import bbo from 'buffer-backed-object';
+import {GpsData} from './GpsData.js';
 
-const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PW}@${process.env.MONGODB_ADDRESS}/gps?retryWrites=true&w=majority`;
-const client = new mongodb.MongoClient(uri, { useNewUrlParser: true });
-client.connect();
+import * as db from './db.js';
 
 const app = express();
 
-const ttnBackend = {
-  headers: {
-    Accept: 'application/json',
-    Authorization: 'key ' + process.env.TTN_ACCESS_TOKEN,
-  },
-  url: process.env.TTN_STORAGE_API,
-}
-
-app.use(bodyParser.raw({type: '*/*'}));
+app.use(bodyParser.raw({type: 'application/octet-stream'}));
+app.use(bodyParser.json({type: 'application/json'}));
+app.use(bodyParser.text({type: 'application/base64'}));
 
 app.get('/data', async (req, res)=>{
-  const data1 = await fetch(ttnBackend.url, {headers: ttnBackend.headers}).then(res=>res.status===204?[]:res.json());
-
-  await client.connect();
-  const collection = client.db("gps").collection("upload");
-  const data2 = await collection.find({}).toArray();
-
-  res.send([...data1, ...data2]);
+  res.send(await db.query());
 });
 
-app.all('/upload', async (req, res)=>{
-  console.log(req, res);
-  if (req.body instanceof Buffer) {
-    await client.connect();
-    const collection = client.db("gps").collection("upload");
-    await collection.insertOne({
-      raw: req.body.toString('base64'),
-      time: new Date(),
-      device_id: req.query.device_id,
-    });
+app.post('/upload', async (req, res)=>{
+  await db.insertUpload({
+    query: req.query,
+    headers: req.headers,
+    body: req.body instanceof Buffer ? req.body.toString('base64') : req.body,
+  });
+
+  if (req.query.source === 'wifi' && req.body instanceof Buffer) {
+    const rawLocations = new bbo.ArrayOfBufferBackedObjects(new Uint8Array(req.body).buffer, GpsData);
+    const locations = rawLocations.map(l=>({
+      dev: req.query.dev_id,
+      src: req.query.source,
+      receivedAt: new Date(),
+      ...l,
+    }));
+    if (locations.length) await db.insertLocations(locations);
+  } else if (req.query.source === 'ttn' && typeof req.body === 'object') {
+    const payload = new Uint8Array(new Buffer(req.body.payload_raw, 'base64'));
+    const rawLocations = new bbo.ArrayOfBufferBackedObjects(payload.buffer, GpsData);
+    const locations = rawLocations.map(l=>({
+      dev: req.body.dev_id,
+      src: req.query.source,
+      receivedAt: new Date(),
+      ...l,
+    }));
+    if (locations.length) await db.insertLocations(locations);
   }
   console.log('got gps upload');
 

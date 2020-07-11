@@ -28,7 +28,7 @@ __attribute__((packed)) struct GpsData {
   uint8_t err_lng;
   float lat;
   float lng;
-  float alt;
+  float odo;
 };
 
 __attribute__((packed)) struct StatusData {

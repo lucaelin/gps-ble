@@ -15,6 +15,9 @@ NMEAGPS gps;
 char ubxSpeed[] =
 { 0x06, 0x08, 0x06, 0x00, 0xd0, 0x07, 0x01, 0x00, 0x01, 0x00 };
 
+char ubxEco[] =
+{ 0x06, 0x11, 0x02, 0x00, 0x08, 0x04 };
+
 void sendUBX( char *bytes, size_t len )
 {
   Serial1.write( 0xB5 ); // SYNC1
@@ -46,6 +49,11 @@ void setUBXSpeed(uint16_t ms) {
   Serial.println((int) ms);
 }
 
+void setUBXEco() {
+  sendUBX(ubxEco, 6);
+  Serial.println("Setting ubx to eco mode");
+}
+
 void setupGPS() {
   Serial1.begin(GPSBaud, (uint32_t) SERIAL_8N1, RXPin, TXPin);
 
@@ -73,5 +81,6 @@ void setupGPS() {
   Serial1.println(F("$PUBX,40,GLL,0,0,0,0*5C")); //GLL OFF
   delay(100);
 
+  setUBXEco();
   setUBXSpeed(2000);
 }

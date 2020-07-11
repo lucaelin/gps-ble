@@ -67,6 +67,13 @@ float calcDeviation(NeoGPS::Location_t a, NeoGPS::Location_t b, NeoGPS::Location
   return offset;
 }
 
+uint16_t sleepDuration = 1;
+
+void setUpdateSpeed(uint16_t ms) {
+  setUBXSpeed(ms);
+  sleepDuration = ms;
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -79,6 +86,7 @@ void setup() {
   axp.setPowerOutPut(AXP192_LDO3, AXP202_ON);  // gps
   axp.setPowerOutPut(AXP192_DCDC2, AXP202_ON); // ?
   axp.setPowerOutPut(AXP192_DCDC1, AXP202_ON); // OLED pins + some other
+  axp.setChgLEDMode(AXP20X_LED_LOW_LEVEL); // LED full on
   axp.setDCDC1Voltage(3300);
 
   Serial.printf("DCDC1: %s\n", axp.isDCDC1Enable() ? "ENABLE" : "DISABLE");
@@ -93,10 +101,12 @@ void setup() {
   Serial.println("TTN setup");
   setupTTN();
   delay(100);
+  axp.setPowerOutPut(AXP192_LDO2, AXP202_OFF);  // lora
 #endif
 
   Serial.println("GPS setup");
   setupGPS();
+  setUpdateSpeed(2000);
   delay(100);
 
   //FFat.format();
@@ -121,103 +131,58 @@ void setup() {
 }
 
 Situation processGps() {
-    if (lastStoredGps.status == NOT_VALID) {
-      return SIGNIFICANT;
-    }
+  if (lastStoredGps.status == NOT_VALID) {
+    return SIGNIFICANT;
+  }
 
-    Geofence fence = {
-      .lat = 53.14021301269531,
-      .lng = 8.180638313293457,
-      .width = 30.0,
-      .height = 30.0,
-      .rot = 0.0,
-    };
+  Geofence fence = {
+    .lat = 53.14021301269531,
+    .lng = 8.180638313293457,
+    .width = 30.0,
+    .height = 30.0,
+    .rot = 0.0,
+  };
 
-    NeoGPS::Location_t fenceLocation( fence.lat, fence.lng );
-    boolean currentlyInside = isInsideGeofence(currentLocation, fenceLocation, fence.height, fence.width, fence.rot);
-    boolean previouslyInside = isInsideGeofence(previousLocation, fenceLocation, fence.height, fence.width, fence.rot);
+  NeoGPS::Location_t fenceLocation( fence.lat, fence.lng );
+  boolean currentlyInside = isInsideGeofence(currentLocation, fenceLocation, fence.height, fence.width, fence.rot);
+  boolean previouslyInside = isInsideGeofence(previousLocation, fenceLocation, fence.height, fence.width, fence.rot);
 
-    // decrease update speed if stationary for a while
-    stationaryUpdates++;
-    if (stationaryUpdates == 60) setUBXSpeed( 4000 );
-    if (stationaryUpdates == 200) {
-      setUBXSpeed( 10000 );
-      return currentlyInside?GEOFENCE_STAY:STAY;
-    }
+  currentGps.odo = lastStoredGps.odo + lastStoredLocation.DistanceKm( currentLocation ) * 1000.0;
+  
+  // decrease update speed if stationary for a while
+  stationaryUpdates++;
+  if (stationaryUpdates == 60) setUpdateSpeed( 4000 );
+  if (stationaryUpdates == 200) {
+    setUpdateSpeed( 10000 );
+    return currentlyInside?GEOFENCE_STAY:STAY;
+  }
 
-    if (isInsideGeofence(currentLocation, lastStoredLocation, currentGps.err_lat, currentGps.err_lng, 0.0)) {
-      return STATIONARY;
-    }
-    // not stationary anymore
+  if (isInsideGeofence(currentLocation, lastStoredLocation, currentGps.err_lat, currentGps.err_lng, 0.0)) {
+    return STATIONARY;
+  }
+  // not stationary anymore
 
-    // increase update speed again
-    if (stationaryUpdates > 2) setUBXSpeed( 2000 );
-    // reset counter
-    stationaryUpdates = 0;
+  // increase update speed again
+  if (stationaryUpdates > 2) setUpdateSpeed( 2000 );
+  // reset counter
+  stationaryUpdates = 0;
 
-    if (currentlyInside != previouslyInside) {
-      return currentlyInside?GEOFENCE_ENTER:GEOFENCE_LEAVE;
-    }
+  if (currentlyInside != previouslyInside) {
+    return currentlyInside?GEOFENCE_ENTER:GEOFENCE_LEAVE;
+  }
 
-    float newDeviation = calcDeviation(lastStoredLocation, previousLocation, currentLocation);
-    lineDeviation += newDeviation;
+  float newDeviation = calcDeviation(lastStoredLocation, previousLocation, currentLocation);
+  lineDeviation += newDeviation;
 
-    if (!lastStoredGps.status || currentGps.time - lastStoredGps.time > 60 || abs(newDeviation) > 0.5 || abs(lineDeviation) > 2.0) {
-      lineDeviation = newDeviation;
-      return SIGNIFICANT;
-    } else {
-      return MOVING_STRAIGHT;
-    }
+  if (!lastStoredGps.status || currentGps.time - lastStoredGps.time > 60 || abs(newDeviation) > 0.5 || abs(lineDeviation) > 2.0) {
+    lineDeviation = newDeviation;
+    return SIGNIFICANT;
+  } else {
+    return MOVING_STRAIGHT;
+  }
 }
 
 void loop() {
-  if (gps.available( Serial1 )) {
-    previousGps = currentGps;
-    previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
-
-    currentGps = parseFix(gps.read());
-    currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
-
-    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) {
-      Serial.println("GPS not valid yet...");
-      return;
-    }
-
-    Situation s = processGps();
-
-    currentGps.status = s;
-
-    Serial.print("GPS status: ");
-    Serial.println(s);
-
-    if (previousGps.status >= SIGNIFICANT) {
-      // save to flash
-      storeGpsEntry(&previousGps);
-
-      lastStoredGps = previousGps;
-      lastStoredLocation = previousLocation;
-      Serial.println("Wrote location to history");
-
-#ifdef TBEAM
-      if (previousGps.status >= STAY) {
-        sendTTN(previousGps);
-        Serial.println("Sent location to ttn");
-        uploadWIFI();
-        Serial.println("Sent location to wifi");
-      }
-#endif
-    } else {
-      Serial.println("Skipping location.");
-    }
-
-#ifdef BLE
-    // update possibly connected ble device
-    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
-    currentGPSCharacteristic->notify();
-#endif
-    delay(3);
-  }
-
   if (Serial.available()) {
     char i = (char)Serial.read();
     while (Serial.available()) Serial.read();
@@ -243,5 +208,82 @@ void loop() {
       Serial.printf("Free space: %10u\n", FFat.freeBytes());
       listAllFiles();
     }
+  }
+
+  bool didGpsProcessing = false;
+  
+  while (gps.available( Serial1 )) {
+    didGpsProcessing = true;
+    previousGps = currentGps;
+    previousLocation = NeoGPS::Location_t( previousGps.lat, previousGps.lng );
+
+    currentGps = parseFix(gps.read());
+    currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
+
+    if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) {
+      Serial.println("GPS not valid yet...");
+#ifdef TBEAM
+      axp.setChgLEDMode(AXP20X_LED_BLINK_1HZ); // 1blink/sec, low rate
+#endif
+      continue;
+    }
+    
+#ifdef TBEAM
+    axp.setChgLEDMode(AXP20X_LED_OFF); // LED off
+#endif
+
+    Situation s = processGps();
+
+    currentGps.status = s;
+
+    Serial.print("GPS status: ");
+    Serial.println(s);
+
+    if (previousGps.status >= SIGNIFICANT) {
+      // save to flash
+      storeGpsEntry(&previousGps);
+
+      lastStoredGps = previousGps;
+      lastStoredLocation = previousLocation;
+      Serial.println("Wrote location to history");
+
+      if (previousGps.status >= STAY) {
+#ifdef TBEAM
+        axp.setChgLEDMode(AXP20X_LED_BLINK_4HZ); // 4blink/sec, high rate
+        axp.setPowerOutPut(AXP192_LDO2, AXP202_ON);  // lora
+        sendTTN(previousGps);
+        delay(100);
+        axp.setPowerOutPut(AXP192_LDO2, AXP202_OFF);  // lora
+        Serial.println("Sent location to ttn");
+#endif
+
+        uploadWIFI();
+        Serial.println("Sent location to wifi");
+        
+        storeGpsEntry(&lastStoredGps);
+        
+#ifdef TBEAM
+        axp.setChgLEDMode(AXP20X_LED_OFF); // LED off
+#endif
+      }
+    } else {
+      Serial.println("Skipping location.");
+    }
+
+#ifdef BLE
+    // update possibly connected ble device
+    currentGPSCharacteristic->setValue((uint8_t*)&currentGps, sizeof(GpsData));
+    currentGPSCharacteristic->notify();
+#endif
+    delay(3);
+  }
+
+  if(didGpsProcessing) {
+    //Serial.println("Sleeping...");
+    delay(10);
+    esp_sleep_enable_timer_wakeup((sleepDuration - 500)*1000);
+    esp_light_sleep_start();
+    //Serial.println("Woke up!");
+    delay(10);
   }
 }

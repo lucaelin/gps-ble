@@ -67,13 +67,13 @@ function createPath() {
   }).addTo(mymap);
   const path = {ants, data: []};
   paths.unshift(path);
-  
+
   ants.on('mouseover', ()=>{
     const cursorLocation = cursor.getLatLng();
 
     const distances = path.data.map(point=>({distance: distance(point, cursorLocation), point: point}));
     const closest = distances.reduce((p,c)=>p.distance<c.distance?p:c);
-    
+
     hoverLocation.setLatLng([closest.point.lat, closest.point.lng, ]);
     hoverLocation.setRadius([closest.point.errLat, closest.point.errLng, ]);
     console.log(closest.point);
@@ -127,6 +127,7 @@ export function plotPosition(gpsData, realtime=false) {
     path.data = path.data.sort((a,b)=>a.time-b.time);
   }
 
+  console.log(path.data);
   path.ants.setLatLngs(
     path.data.map(({lat, lng})=>[lat, lng])
   );
@@ -151,7 +152,7 @@ export function plotPath(path) {
 export function plotStop(gpsData) {
   const date = Y2KtoDate(gpsData.time);
   const marker = L.marker([gpsData.lat, gpsData.lng], {title: GpsStatusLookup[gpsData.status] + ' at '+date.toLocaleString()}).addTo(mymap);
-  
+
   marker.on('mouseover', ()=>{
     hoverLocation.setLatLng([gpsData.lat, gpsData.lng, ]);
     hoverLocation.setRadius([gpsData.errLat, gpsData.errLng, ]);
