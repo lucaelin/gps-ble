@@ -148,13 +148,13 @@ Situation processGps() {
   boolean previouslyInside = isInsideGeofence(previousLocation, fenceLocation, fence.height, fence.width, fence.rot);
 
   currentGps.odo = lastStoredGps.odo + lastStoredLocation.DistanceKm( currentLocation ) * 1000.0;
-  
+
   // decrease update speed if stationary for a while
   stationaryUpdates++;
   if (stationaryUpdates == 60) setUpdateSpeed( 4000 );
   if (stationaryUpdates == 200) {
     setUpdateSpeed( 10000 );
-    return currentlyInside?GEOFENCE_STAY:STAY;
+    return currentlyInside ? GEOFENCE_STAY : STAY;
   }
 
   if (isInsideGeofence(currentLocation, lastStoredLocation, currentGps.err_lat, currentGps.err_lng, 0.0)) {
@@ -168,7 +168,7 @@ Situation processGps() {
   stationaryUpdates = 0;
 
   if (currentlyInside != previouslyInside) {
-    return currentlyInside?GEOFENCE_ENTER:GEOFENCE_LEAVE;
+    return currentlyInside ? GEOFENCE_ENTER : GEOFENCE_LEAVE;
   }
 
   float newDeviation = calcDeviation(lastStoredLocation, previousLocation, currentLocation);
@@ -187,31 +187,37 @@ void loop() {
     char i = (char)Serial.read();
     while (Serial.available()) Serial.read();
 
-    if (i=='h') {
+    if (i == 'h') {
       Serial.println("command h: help");
       Serial.println("command t: sendTTN(currentGps)");
       Serial.println("command u: uploadWIFI()");
       Serial.println("command r: ESP.restart()");
       Serial.println("command f: print flash info");
-    } else if (i=='t') {
+      Serial.println("command g: enter gps forward mode");
+    } else if (i == 't') {
       Serial.println("command t: sendTTN(currentGps)");
       sendTTN(currentGps);
-    } else if (i=='u') {
+    } else if (i == 'u') {
       Serial.println("command u: uploadWIFI()");
       uploadWIFI();
-    } else if (i=='r') {
+    } else if (i == 'r') {
       Serial.println("command r: ESP.restart()");
       ESP.restart();
-    } else if (i=='f') {
+    } else if (i == 'f') {
       Serial.println("command f: ");
       Serial.printf("Total space: %10u\n", FFat.totalBytes());
       Serial.printf("Free space: %10u\n", FFat.freeBytes());
       listAllFiles();
+    } else if (i == 'g') {
+      while (true) {
+        if (Serial.available()) Serial1.write(Serial.read());
+        if (Serial1.available()) Serial.write(Serial1.read());
+      }
     }
   }
 
   bool didGpsProcessing = false;
-  
+
   while (gps.available( Serial1 )) {
     didGpsProcessing = true;
     previousGps = currentGps;
@@ -221,13 +227,13 @@ void loop() {
     currentLocation = NeoGPS::Location_t( currentGps.lat, currentGps.lng );
 
     if (currentGps.status == NOT_VALID || previousGps.status == NOT_VALID) {
-      Serial.println("GPS not valid yet...");
+      Serial.println(" ... GPS not valid yet");
 #ifdef TBEAM
       axp.setChgLEDMode(AXP20X_LED_BLINK_1HZ); // 1blink/sec, low rate
 #endif
       continue;
     }
-    
+
 #ifdef TBEAM
     axp.setChgLEDMode(AXP20X_LED_OFF); // LED off
 #endif
@@ -259,9 +265,9 @@ void loop() {
 
         uploadWIFI();
         Serial.println("Sent location to wifi");
-        
+
         storeGpsEntry(&lastStoredGps);
-        
+
 #ifdef TBEAM
         axp.setChgLEDMode(AXP20X_LED_OFF); // LED off
 #endif
@@ -278,10 +284,10 @@ void loop() {
     delay(3);
   }
 
-  if(didGpsProcessing) {
-    //Serial.println("Sleeping...");
-    delay(10);
-    esp_sleep_enable_timer_wakeup((sleepDuration - 500)*1000);
+  if (didGpsProcessing) {
+  //Serial.println("Sleeping...");
+  delay(10);
+    esp_sleep_enable_timer_wakeup((sleepDuration - 500) * 1000);
     esp_light_sleep_start();
     //Serial.println("Woke up!");
     delay(10);

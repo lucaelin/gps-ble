@@ -17,6 +17,7 @@ app.get('/data', async (req, res)=>{
 
 app.post('/upload', async (req, res)=>{
   await db.insertUpload({
+    time: new Date(),
     query: req.query,
     headers: req.headers,
     body: req.body instanceof Buffer ? req.body.toString('base64') : req.body,

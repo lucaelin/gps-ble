@@ -56,7 +56,7 @@ void uploadWIFI() {
     Serial.println("Awaiting response...");
 
     uint32_t count = 0;
-    while(count < 100 && client.available()<=16) {
+    while(count < 200 && client.available()<=16) {
       delay(100);
       count++;
     }

@@ -67,18 +67,14 @@ void setupGPS() {
 
   // include location error data (GST sentences)
   delay(1000);
-  gps.send_P( &Serial1, F("PUBX,40,GST,0,1,0,0,0,0") );
-  delay(100);
-
-  Serial1.println(F("$PUBX,40,VTG,0,0,0,0*5E")); //VTG OFF
-  delay(100);
-  //Serial1.println(F("$PUBX,40,GGA,0,0,0,0*5A")); //GGA OFF
-  //delay(100);
-  Serial1.println(F("$PUBX,40,GSA,0,0,0,0*4E")); //GSA OFF
-  delay(100);
-  Serial1.println(F("$PUBX,40,GSV,0,0,0,0*59")); //GSV OFF
-  delay(100);
-  Serial1.println(F("$PUBX,40,GLL,0,0,0,0*5C")); //GLL OFF
+  gps.send_P( &Serial1, F("PUBX,40,RMC,0,0,0,0,0,0") ); // recommended minimum data for gps
+  gps.send_P( &Serial1, F("PUBX,40,GLL,0,0,0,0,0,0") ); // Lat/Lon data
+  gps.send_P( &Serial1, F("PUBX,40,GSV,0,0,0,0,0,0") ); // Detailed Satellite data
+  gps.send_P( &Serial1, F("PUBX,40,GSA,0,1,0,0,0,0") ); // Overall Satellite data
+  gps.send_P( &Serial1, F("PUBX,40,GGA,0,1,0,0,0,0") ); // Fix information
+  gps.send_P( &Serial1, F("PUBX,40,GST,0,1,0,0,0,0") ); // GPS Pseudorange Noise Statistics
+  gps.send_P( &Serial1, F("PUBX,40,VTG,0,0,0,0,0,0") ); // Vector track an Speed over the Ground
+  gps.send_P( &Serial1, F("PUBX,40,ZDA,0,1,0,0,0,0") ); // Date and Time
   delay(100);
 
   setUBXEco();

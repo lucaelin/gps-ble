@@ -12,17 +12,21 @@ bool pointInEllipse(int x, int y, int a, int b) {
 GpsData parseFix(gps_fix fix) {
   GpsData gpsData;
 
-  bool isValid = fix.status >= 3 && fix.valid.satellites && fix.valid.location;
+  Serial.print("status: ");
+  Serial.print((int)fix.status);
+  Serial.print(", err: ");
+  Serial.print((int)(fix.valid.lat_err && fix.valid.lon_err));
+  Serial.print((int)(fix.lat_err()));
+  Serial.print(", loca: ");
+  Serial.print((int)fix.valid.location);
+  Serial.print("\n");
+  
+  bool isValid = fix.status >= 3 && fix.valid.location && fix.valid.lat_err && fix.valid.lon_err;
   gpsData.status = isValid ? SIGNIFICANT : NOT_VALID;
 
   if (fix.valid.date && fix.valid.time)
   {
     gpsData.time = (NeoGPS::clock_t) fix.dateTime;
-  }
-
-  if (fix.valid.satellites)
-  {
-    gpsData.sats = fix.satellites;
   }
 
   if (fix.valid.location)
