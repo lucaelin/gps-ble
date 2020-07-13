@@ -31,7 +31,8 @@ app.post('/upload', async (req, res)=>{
       receivedAt: new Date(),
       ...l,
     }));
-    if (locations.length) await db.insertLocations(locations);
+    console.log(locations);
+    if (locations.length) console.log(await db.insertLocations(locations));
   } else if (req.query.source === 'ttn' && typeof req.body === 'object') {
     const payload = new Uint8Array(new Buffer(req.body.payload_raw, 'base64'));
     const rawLocations = new bbo.ArrayOfBufferBackedObjects(payload.buffer, GpsData);
@@ -41,7 +42,17 @@ app.post('/upload', async (req, res)=>{
       receivedAt: new Date(),
       ...l,
     }));
-    if (locations.length) await db.insertLocations(locations);
+    if (locations.length) console.log(await db.insertLocations(locations));
+  } else if (req.query.source === 'manual' && typeof req.body === 'string') {
+    const payload = new Uint8Array(new Buffer(req.body, 'base64'));
+    const rawLocations = new bbo.ArrayOfBufferBackedObjects(payload.buffer, GpsData);
+    const locations = rawLocations.map(l=>({
+      dev: req.query.dev_id,
+      src: req.query.source,
+      receivedAt: new Date(),
+      ...l,
+    }));
+    if (locations.length) console.log(await db.insertLocations(locations));
   }
   console.log('got gps upload');
 
