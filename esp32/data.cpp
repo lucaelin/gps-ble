@@ -20,7 +20,7 @@ GpsData parseFix(gps_fix fix) {
   Serial.print(", loca: ");
   Serial.print((int)fix.valid.location);
   Serial.print("\n");
-  
+
   bool isValid = fix.status >= 3 && fix.valid.location && fix.valid.lat_err && fix.valid.lon_err;
   gpsData.status = isValid ? SIGNIFICANT : NOT_VALID;
 
@@ -62,4 +62,18 @@ void storeGpsEntry(GpsData *entry) {
     Serial.printf("Free space below threshold, deleting old logs");
     deleteOldestFile();
   }
+}
+
+void loadLastGps(GpsData* lastStoredGps) {
+  File gps_log = getGPSLog();
+  if (!gps_log) {
+    Serial.println("There was an error opening the file for reading");
+    return;
+  }
+  gps_log.seek(0);
+  while (gps_log.available()>=sizeof(GpsData)) {
+    GpsData new_gps;
+    if(!gps_log.read((uint8_t*) lastStoredGps, sizeof(GpsData))) continue;
+  }
+  gps_log.close();
 }

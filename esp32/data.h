@@ -50,5 +50,6 @@ __attribute__((packed)) struct Geofence {
 GpsData parseFix(gps_fix fix);
 bool pointInEllipse(int x, int y, int a, int b);
 void storeGpsEntry(GpsData *entry);
+void loadLastGps(GpsData* lastStoredGps);
 
 #endif

@@ -101,7 +101,6 @@ void setup() {
   Serial.println("TTN setup");
   setupTTN();
   delay(100);
-  axp.setPowerOutPut(AXP192_LDO2, AXP202_OFF);  // lora
 #endif
 
   Serial.println("GPS setup");
@@ -114,6 +113,9 @@ void setup() {
     Serial.println("FFat Mount Failed");
     return;
   }
+  
+  loadLastGps(&lastStoredGps);
+  lastStoredLocation = NeoGPS::Location_t( lastStoredGps.lat, lastStoredGps.lng );
 
 #ifdef BLE
   Serial.println("BLE setup");
@@ -256,10 +258,8 @@ void loop() {
       if (previousGps.status >= STAY) {
 #ifdef TBEAM
         axp.setChgLEDMode(AXP20X_LED_BLINK_4HZ); // 4blink/sec, high rate
-        axp.setPowerOutPut(AXP192_LDO2, AXP202_ON);  // lora
         sendTTN(previousGps);
         delay(100);
-        axp.setPowerOutPut(AXP192_LDO2, AXP202_OFF);  // lora
         Serial.println("Sent location to ttn");
 #endif
 
